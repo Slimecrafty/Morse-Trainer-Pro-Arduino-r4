@@ -38,6 +38,8 @@ Connect your paddle to the Arduino UNO R4 WiFi as follows:
 1. Simply open `MorseTrainer_v13.html` in any modern web browser.
 2. If you are using the Bluetooth feature, ensure your browser supports Web Bluetooth (Chrome/Edge recommended).
 3. Connect to the device named **"Arduino-MorseTrainer"**.
+Or use online variant with real band propagation:
+https://slimecrafty.github.io/Morse-Trainer-Pro-Arduino-r4/
 
 ## Dependencies
 - **Arduino IDE**
