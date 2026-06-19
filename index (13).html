@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Morse-Trainer Pro v13 – Koch & QSO</title>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --accent: #10b981;
+            --accent-hover: #059669;
+            --danger: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { background-color: var(--bg-primary); color: var(--text-main); display: flex; flex-direction: column; align-items: center; padding: 2rem; min-height: 100vh; }
+        h1 { color: var(--accent); text-shadow: 0 0 15px rgba(16,185,129,0.3); margin-bottom: 1.5rem; font-size: 1.8rem; }
+        .container { width: 100%; max-width: 960px; background: var(--bg-secondary); border-radius: 16px; padding: 2rem; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5); }
+        .tabs { display: flex; border-bottom: 2px solid #334155; margin-bottom: 2rem; }
+        .tab-btn { background: none; color: var(--text-muted); border: none; padding: 1rem 2rem; font-size: 1.05rem; cursor: pointer; border-bottom: 3px solid transparent; transition: 0.3s; }
+        .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: bold; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+        /* Connection panel */
+        .connection-panel { display: flex; gap: 1rem; justify-content: center; margin-bottom: 2rem; flex-wrap: wrap; align-items: center; }
+        button { background-color: var(--accent); color: var(--bg-primary); border: none; padding: 0.75rem 1.5rem; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        button:hover { background-color: var(--accent-hover); transform: translateY(-2px); }
+        button:active { transform: translateY(0); }
+        .btn-blue { background-color: #3b82f6; color: white; }
+        .btn-blue:hover { background-color: #2563eb; }
+        .btn-red { background-color: var(--danger); color: white; }
+        .btn-red:hover { background-color: #dc2626; }
+        .btn-gray { background-color: #475569; color: white; font-size: 0.85rem; padding: 0.5rem 1rem; }
+        .status-badge { padding: 0.3rem 0.9rem; border-radius: 9999px; font-size: 0.85rem; background: #475569; display: inline-flex; align-items: center; gap: 0.4rem; }
+        .status-connected { background: rgba(16,185,129,0.15); color: var(--accent); border: 1px solid var(--accent); }
+
+        /* TRAINER */
+        .training-display { text-align: center; padding: 2.5rem 1rem; background: rgba(15,23,42,0.6); border-radius: 12px; border: 1px solid #334155; margin-bottom: 1.5rem; transition: background 0.25s; position: relative; }
+        .target-char { font-size: 5.5rem; font-weight: 900; line-height: 1; }
+        .target-code { font-size: 2rem; color: var(--accent); letter-spacing: 0.3rem; margin-top: 0.5rem; min-height: 2.5rem; }
+        .hint-btn { margin-top: 1rem; background: transparent; border: 1px solid #475569; color: var(--text-muted); font-size: 0.8rem; padding: 0.4rem 1rem; }
+        .hint-btn:hover { background: #334155; transform: none; }
+        .live-stream { background: #000; font-family: 'Courier New', monospace; padding: 0.8rem 1rem; border-radius: 8px; height: 70px; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; color: #ff0055; letter-spacing: 6px; border: 1px solid #ff0055; margin-bottom: 1rem; user-select: none; }
+        .stats-bar { display: flex; justify-content: space-around; background: #334155; padding: 1rem; border-radius: 8px; }
+        .stat-item { text-align: center; }
+        .stat-label { font-size: 0.75rem; color: var(--text-muted); }
+        .stat-val { font-size: 1.4rem; font-weight: bold; color: var(--accent); }
+        .locked-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.55); border-radius: 12px; display: none; align-items: center; justify-content: center; font-size: 1.2rem; color: var(--text-muted); letter-spacing: 0.1rem; }
+        .locked-overlay.show { display: flex; }
+
+        /* QSO */
+        .qso-panel { background: #253047; padding: 1.5rem; border-radius: 12px; }
+        .qso-panel h3 { margin-bottom: 0.5rem; }
+        .controls { display: flex; gap: 0.75rem; margin: 1rem 0; align-items: center; flex-wrap: wrap; }
+        select { padding: 0.5rem 0.75rem; background: #0f172a; color: white; border: 1px solid #475569; border-radius: 6px; font-size: 0.95rem; }
+        .s-meter-wrap { margin: 0.75rem 0; }
+        .s-meter { background: #000; height: 28px; border-radius: 4px; overflow: hidden; border: 1px solid #475569; }
+        .s-meter-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #10b981 55%, #f59e0b 80%, #ef4444 100%); transition: width 0.12s; }
+        .qso-log { background: #0d1b2e; padding: 0.75rem 1rem; font-family: 'Courier New', monospace; font-size: 0.9rem; height: 200px; overflow-y: auto; border-radius: 6px; margin-top: 0.75rem; color: #10b981; border: 1px solid #1e3a5f; line-height: 1.6; }
+        .qso-log .rx { color: #10b981; }
+        .qso-log .tx { color: #60a5fa; }
+        .qso-log .sys { color: #94a3b8; font-style: italic; }
+        .qso-log .err { color: #ef4444; }
+        .tx-area { display: flex; gap: 0.5rem; margin-top: 0.75rem; align-items: center; }
+        .tx-input { flex: 1; background: #0d1b2e; border: 1px solid #334155; color: var(--text-main); padding: 0.5rem 0.75rem; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 1rem; }
+        .tx-input:focus { outline: none; border-color: #60a5fa; }
+        .tx-input::placeholder { color: #475569; }
+        .qso-phase-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: bold; background: #334155; color: var(--text-muted); margin-left: 0.5rem; }
+        .qso-phase-badge.rx { background: rgba(16,185,129,0.2); color: var(--accent); }
+        .qso-phase-badge.tx { background: rgba(96,165,250,0.2); color: #60a5fa; }
+
+        /* BAND CONDITIONS */
+        .band-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+        .solar-panel { background: #253047; border-radius: 10px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; }
+        .solar-item { text-align: center; }
+        .solar-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05rem; }
+        .solar-val { font-size: 1.4rem; font-weight: bold; color: var(--accent); }
+        .solar-val.warn { color: #f59e0b; }
+        .solar-val.bad { color: var(--danger); }
+        .band-table { width: 100%; border-collapse: collapse; }
+        .band-table th, .band-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #253047; font-size: 0.95rem; }
+        .band-table thead { background: #253047; }
+        .band-table th { color: var(--accent); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05rem; }
+        .band-table tr:hover td { background: rgba(255,255,255,0.02); }
+        .cond-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.8rem; }
+        .cond-badge.good { background: rgba(16,185,129,0.15); color: #10b981; }
+        .cond-badge.fair { background: rgba(245,158,11,0.15); color: #f59e0b; }
+        .cond-badge.poor { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .band-update-info { font-size: 0.78rem; color: var(--text-muted); }
+        /* WPM SLIDER */
+        .wpm-control { background: #1a2744; border: 1px solid #334155; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+        .wpm-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; font-size: 0.9rem; color: var(--text-muted); }
+        .wpm-row strong { color: var(--accent); }
+        input[type=range] { width: 100%; accent-color: var(--accent); height: 6px; cursor: pointer; }
+        .wpm-labels { display: flex; justify-content: space-between; font-size: 0.72rem; color: #475569; margin-top: 0.35rem; }
+        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #475569; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 0.4rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* KOCH TRAINER – Phasen & Animationen */
+        .trainer-phase-badge {
+            display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px;
+            font-size: 0.72rem; font-weight: bold; letter-spacing: 0.06rem; text-transform: uppercase;
+            margin-bottom: 0.75rem; transition: all 0.35s ease;
+        }
+        .trainer-phase-badge.intro { background: rgba(245,158,11,0.2); color: #f59e0b; animation: badgePulse 2s ease-in-out infinite; }
+        .trainer-phase-badge.train { background: rgba(16,185,129,0.15); color: var(--accent); }
+        .trainer-phase-badge.reminder { background: rgba(239,68,68,0.15); color: var(--danger); animation: badgePulse 1.2s ease-in-out infinite; }
+        @keyframes badgePulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.85; transform:scale(1.03); } }
+
+        .training-display.intro-mode { border-color: #f59e0b; box-shadow: 0 0 30px rgba(245,158,11,0.15); }
+        .training-display.reminder-mode { border-color: var(--danger); box-shadow: 0 0 30px rgba(239,68,68,0.12); }
+        .training-display.success-flash { animation: successFlash 0.6s ease; }
+        .training-display.fail-shake { animation: failShake 0.5s ease; }
+        @keyframes successFlash { 0% { box-shadow: 0 0 0 rgba(16,185,129,0); } 40% { box-shadow: 0 0 40px rgba(16,185,129,0.4); } 100% { box-shadow: none; } }
+        @keyframes failShake { 0%,100% { transform:translateX(0); } 20% { transform:translateX(-8px); } 40% { transform:translateX(8px); } 60% { transform:translateX(-5px); } 80% { transform:translateX(5px); } }
+
+        .target-char { transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+        .target-char.char-pop { animation: charPop 0.55s cubic-bezier(0.34,1.56,0.64,1); }
+        @keyframes charPop { 0% { transform:scale(0.3); opacity:0; } 70% { transform:scale(1.08); } 100% { transform:scale(1); opacity:1; } }
+
+        .morse-viz {
+            display: flex; justify-content: center; align-items: center; gap: 0.35rem;
+            min-height: 3rem; margin: 0.75rem 0; flex-wrap: wrap;
+        }
+        .morse-viz.hidden { display: none; }
+        .m-sym {
+            display: inline-block; border-radius: 4px; background: var(--accent);
+            opacity: 0; transform: scale(0); animation: symIn 0.35s forwards;
+        }
+        .m-sym.dot { width: 14px; height: 14px; border-radius: 50%; }
+        .m-sym.dash { width: 36px; height: 10px; border-radius: 3px; }
+        .m-sym.gap { width: 12px; background: transparent; animation: none; opacity: 1; transform: none; }
+        @keyframes symIn { to { opacity: 1; transform: scale(1); } }
+
+        .target-code { transition: color 0.3s, letter-spacing 0.3s; }
+        .target-code.reveal { animation: morseReveal 0.4s ease; }
+        @keyframes morseReveal { from { letter-spacing: 0.8rem; opacity: 0.3; } to { letter-spacing: 0.3rem; opacity: 1; } }
+
+        .intro-btn {
+            display: none; margin-top: 1rem; background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #0f172a; font-size: 0.95rem; animation: btnGlow 2s ease-in-out infinite;
+        }
+        .intro-btn.show { display: inline-block; }
+        .intro-btn:hover { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+        @keyframes btnGlow { 0%,100% { box-shadow: 0 0 0 rgba(245,158,11,0); } 50% { box-shadow: 0 0 20px rgba(245,158,11,0.35); } }
+
+        .koch-progress-wrap { margin-bottom: 1rem; }
+        .koch-progress-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.35rem; display: flex; justify-content: space-between; }
+        .koch-progress { height: 6px; background: #334155; border-radius: 9999px; overflow: hidden; }
+        .koch-progress-bar { height: 100%; background: var(--accent); border-radius: 9999px; transition: width 0.5s ease; width: 0%; }
+
+        .live-stream.signal-pulse { animation: streamPulse 0.15s ease; }
+        @keyframes streamPulse { 0% { border-color: #ff0055; } 50% { border-color: #fff; box-shadow: 0 0 15px rgba(255,0,85,0.4); } 100% { border-color: #ff0055; } }
+
+        .locked-overlay.show { animation: overlayIn 0.25s ease; }
+        @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* QSO – Propagation Panel */
+        .qso-prop-panel {
+            background: #1a2744; border: 1px solid #334155; border-radius: 10px;
+            padding: 1rem 1.25rem; margin-bottom: 1rem; display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem;
+        }
+        .qso-prop-item { text-align: center; }
+        .qso-prop-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04rem; }
+        .qso-prop-val { font-size: 1.1rem; font-weight: bold; color: var(--accent); margin-top: 0.15rem; }
+        .qso-prop-val.closed { color: var(--danger); }
+        .qso-prop-val.weak { color: #f59e0b; }
+        .qso-band-hint { font-size: 0.82rem; color: var(--text-muted); margin: 0.5rem 0; padding: 0.5rem 0.75rem; background: rgba(15,23,42,0.5); border-radius: 6px; border-left: 3px solid var(--accent); }
+        .qso-band-hint.closed { border-left-color: var(--danger); color: #fca5a5; }
+        .rig-display { font-family: 'Courier New', monospace; font-size: 0.78rem; color: #64748b; margin-top: 0.5rem; }
+        .cw-waterfall { height: 4px; background: #0d1b2e; border-radius: 2px; margin-top: 0.5rem; overflow: hidden; position: relative; }
+        .cw-waterfall-bar { position: absolute; height: 100%; width: 30%; background: rgba(16,185,129,0.5); animation: waterfall 3s linear infinite; }
+        @keyframes waterfall { 0% { left: -30%; } 100% { left: 100%; } }
+
+        /* Koch intro – extra animations */
+        .intro-ring {
+            position: absolute; inset: -4px; border-radius: 14px; pointer-events: none;
+            border: 2px solid transparent; opacity: 0;
+        }
+        .training-display.intro-mode .intro-ring {
+            border-color: rgba(245,158,11,0.45);
+            animation: introRing 2.2s ease-out infinite;
+        }
+        @keyframes introRing {
+            0% { transform: scale(1); opacity: 0.7; }
+            100% { transform: scale(1.06); opacity: 0; }
+        }
+        .training-display.intro-mode .target-char {
+            animation: letterGlow 1.8s ease-in-out infinite;
+            text-shadow: 0 0 30px rgba(245,158,11,0.5);
+        }
+        @keyframes letterGlow {
+            0%,100% { color: #f8fafc; filter: brightness(1); }
+            50% { color: #fbbf24; filter: brightness(1.15); }
+        }
+        .m-sym.playing { animation: symPulse 0.25s ease; box-shadow: 0 0 12px rgba(16,185,129,0.8); }
+        @keyframes symPulse { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
+        .level-up-burst {
+            position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 12px;
+        }
+        .level-up-burst span {
+            position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+            animation: burstFly 0.9s ease-out forwards;
+        }
+        @keyframes burstFly {
+            0% { transform: translate(0,0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--bx), var(--by)) scale(0); opacity: 0; }
+        }
+        .koch-progress-bar.level-up { animation: barShine 1s ease; }
+        @keyframes barShine {
+            0% { box-shadow: none; } 50% { box-shadow: 0 0 20px rgba(16,185,129,0.8); } 100% { box-shadow: none; }
+        }
+        .audio-wave {
+            display: flex; justify-content: center; align-items: flex-end; gap: 3px;
+            height: 28px; margin: 0.5rem 0; opacity: 0; transition: opacity 0.3s;
+        }
+        .audio-wave.active { opacity: 1; }
+        .audio-wave i {
+            display: block; width: 4px; background: var(--accent); border-radius: 2px;
+            animation: waveBar 0.5s ease-in-out infinite alternate;
+        }
+        .audio-wave i:nth-child(1) { animation-delay: 0s; height: 8px; }
+        .audio-wave i:nth-child(2) { animation-delay: 0.08s; height: 14px; }
+        .audio-wave i:nth-child(3) { animation-delay: 0.16s; height: 22px; }
+        .audio-wave i:nth-child(4) { animation-delay: 0.24s; height: 14px; }
+        .audio-wave i:nth-child(5) { animation-delay: 0.32s; height: 8px; }
+        @keyframes waveBar { from { transform: scaleY(0.4); } to { transform: scaleY(1); } }
+        .data-source-badge {
+            font-size: 0.72rem; color: var(--text-muted); margin-top: 0.35rem;
+        }
+        .data-source-badge strong { color: var(--accent); }
+    </style>
+</head>
+<body>
+<h1>⚡ Morse Pro & Ham Simulator</h1>
+<div class="container">
+
+    <!-- Connection Bar -->
+    <div class="connection-panel">
+        <button id="btn-usb" class="btn-blue">🔌 USB (Serial)</button>
+        <button id="btn-ble">🔵 Bluetooth (BLE)</button>
+        <button id="btn-disconnect" class="btn-gray" style="display:none" onclick="disconnect()">✖ Trennen</button>
+        <span id="conn-status" class="status-badge">⚫ Nicht verbunden</span>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('tab-train', this)">🧠 Memory-Trainer</button>
+        <button class="tab-btn" onclick="switchTab('tab-qso', this)">📻 QSO Simulator</button>
+        <button class="tab-btn" onclick="switchTab('tab-bands', this)">🌍 Band Conditions</button>
+    </div>
+
+    <!-- TAB: TRAINER -->
+    <div id="tab-train" class="tab-content active">
+        <h3 style="margin-bottom:0.5rem;">Koch-Methode – Schritt für Schritt</h3>
+        <p style="color:var(--text-muted); margin-bottom:1.2rem; font-size:0.9rem;">
+            Neues Zeichen? Erst Morsecode lernen &amp; hören, dann auswendig tippen. Bei Fehlern wird der Code nochmal gezeigt.
+        </p>
+
+        <div class="koch-progress-wrap">
+            <div class="koch-progress-label">
+                <span>Koch-Fortschritt</span>
+                <span id="koch-progress-text">1 / 52 Zeichen</span>
+            </div>
+            <div class="koch-progress"><div class="koch-progress-bar" id="koch-progress-bar"></div></div>
+        </div>
+
+        <div class="training-display" id="display-area">
+            <div class="intro-ring"></div>
+            <div class="level-up-burst" id="level-up-burst"></div>
+            <div class="trainer-phase-badge train" id="trainer-phase-badge">Üben</div>
+            <div class="target-char char-pop" id="target-character">–</div>
+            <div class="audio-wave" id="audio-wave"><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="morse-viz hidden" id="morse-viz"></div>
+            <div class="target-code" id="target-morse"></div>
+            <div id="intro-label" style="display:none; font-size:0.85rem; color:#f59e0b; letter-spacing:0.05rem; margin-top:0.5rem; max-width:420px; margin-left:auto; margin-right:auto;">
+                Neues Zeichen – merke dir den Code, dann tippe ihn aus dem Gedächtnis!
+            </div>
+            <button class="intro-btn" id="btn-start-train" onclick="finishIntro()">Verstanden – jetzt üben</button>
+            <button class="hint-btn" id="hint-btn" onclick="showHint()">Hilfe: Morsecode zeigen</button>
+            <div class="locked-overlay" id="locked-overlay">Nächste Aufgabe…</div>
+        </div>
+
+        <div class="wpm-control">
+            <div class="wpm-row">
+                <label for="wpm-slider">⏱ WPM / Debounce <span style="font-size:0.72rem; color:#475569">(Präfix-Erkennung für 9, M, …)</span></label>
+                <span id="wpm-display">20 WPM — Wartezeit: <strong id="wpm-delay-ms">270</strong> ms</span>
+            </div>
+            <input type="range" id="wpm-slider" min="5" max="35" value="20" step="1"
+                   oninput="onWpmSlider(this.value)">
+            <div class="wpm-labels"><span>5 WPM (langsam)</span><span>35 WPM (schnell)</span></div>
+        </div>
+
+        <div class="live-stream" id="live-input" title="Deine Eingabe (. und -)">&#8203;</div>
+
+        <div class="stats-bar">
+            <div class="stat-item"><div class="stat-label">WPM</div><div class="stat-val" id="val-wpm">20</div></div>
+            <div class="stat-item"><div class="stat-label">Debounce (KB)</div><div class="stat-val" id="val-debounce">270ms</div></div>
+            <div class="stat-item"><div class="stat-label">Debounce (HW)</div><div class="stat-val" id="val-hw-debounce">720ms</div></div>
+            <div class="stat-item"><div class="stat-label">Genauigkeit</div><div class="stat-val" id="val-accuracy">–</div></div>
+            <div class="stat-item"><div class="stat-label">Streak</div><div class="stat-val" id="val-streak">0</div></div>
+            <div class="stat-item"><div class="stat-label">Level</div><div class="stat-val" id="val-level">1</div></div>
+        </div>
+        <p style="text-align:center; margin-top:1rem;">
+            <button class="btn-gray" onclick="resetProgress()" title="Koch-Fortschritt aus Cookie löschen">↺ Fortschritt zurücksetzen</button>
+            <span style="font-size:0.75rem; color:var(--text-muted); margin-left:0.5rem;">Fortschritt wird automatisch im Cookie gespeichert</span>
+        </p>
+    </div>
+
+    <!-- TAB: QSO -->
+    <div id="tab-qso" class="tab-content">
+        <div class="qso-panel">
+            <h3>QSO Simulator
+                <span class="qso-phase-badge" id="qso-phase-badge">Bereit</span>
+            </h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin-top:0.4rem;">
+                Realistischer CW-Kontakt – Signalstärke, Rauschen und QSB basieren auf Live-Daten wie HamDash (HamQSL + PSK Reporter).
+            </p>
+
+            <div class="qso-prop-panel" id="qso-prop-panel">
+                <div class="qso-prop-item"><div class="qso-prop-label">Band-Status</div><div class="qso-prop-val" id="qp-status">–</div></div>
+                <div class="qso-prop-item"><div class="qso-prop-label">SFI / K-Index</div><div class="qso-prop-val" id="qp-solar">–</div></div>
+                <div class="qso-prop-item"><div class="qso-prop-label">Signal (S)</div><div class="qso-prop-val" id="qp-signal">–</div></div>
+                <div class="qso-prop-item"><div class="qso-prop-label">QRN / QSB</div><div class="qso-prop-val" id="qp-noise">–</div></div>
+                <div class="qso-prop-item"><div class="qso-prop-label">DX-Geschw.</div><div class="qso-prop-val" id="qp-wpm">–</div></div>
+                <div class="qso-prop-item"><div class="qso-prop-label">Propagation</div><div class="qso-prop-val" id="qp-prop">–</div></div>
+            </div>
+            <div class="qso-band-hint" id="qso-band-hint">Band wählen – Live-Daten werden geladen…</div>
+            <div class="rig-display" id="rig-display">RX: 7.010 MHz · Filter: 500 Hz · Mode: CW</div>
+            <div class="cw-waterfall" id="cw-waterfall" style="display:none"><div class="cw-waterfall-bar"></div></div>
+
+            <div class="controls">
+                <select id="band-select">
+                    <option value="160m">160m – 1.8 MHz (Topband)</option>
+                    <option value="80m">80m – 3.5 MHz (Abendband)</option>
+                    <option value="60m">60m – 5.3 MHz (WARC)</option>
+                    <option value="40m" selected>40m – 7.0 MHz (Allround)</option>
+                    <option value="30m">30m – 10.1 MHz (WARC, CW only)</option>
+                    <option value="20m">20m – 14.0 MHz (DX-Band)</option>
+                    <option value="17m">17m – 18.1 MHz (WARC)</option>
+                    <option value="15m">15m – 21.0 MHz (solar)</option>
+                    <option value="12m">12m – 24.9 MHz (WARC)</option>
+                    <option value="11m">11m – 27.5 MHz (CB / Freeband)</option>
+                    <option value="10m">10m – 28.0 MHz (variabel)</option>
+                </select>
+                <input type="text" id="my-callsign" placeholder="Dein Rufzeichen (z.B. DL1ABC)"
+                       style="padding:0.5rem 0.75rem; background:#0f172a; color:white; border:1px solid #475569; border-radius:6px; font-size:0.9rem; width:200px;"
+                       value="DL1ABC" maxlength="10">
+                <button onclick="startQSO()">CQ abhören</button>
+                <button class="btn-red" onclick="stopQSO()">⏹ Stopp</button>
+            </div>
+
+            <div class="s-meter-wrap">
+                <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:0.3rem;">
+                    <span>S-Meter</span>
+                    <span id="smeter-val" style="color:var(--accent); font-weight:bold;">S0</span>
+                </div>
+                <div class="s-meter"><div class="s-meter-bar" id="smeter-bar"></div></div>
+            </div>
+
+            <div class="qso-log" id="qso-log"><span class="sys">[System] Warte auf Start…</span><br></div>
+
+            <div class="tx-area" id="tx-area" style="display:none;">
+                <span style="color:#60a5fa; font-size:0.85rem; white-space:nowrap;">📤 TX:</span>
+                <input type="text" class="tx-input" id="tx-input" placeholder="Text eingeben ODER hier klicken und . / - tippen für Morse …" maxlength="60">
+                <button onclick="sendQsoReply()" style="white-space:nowrap;">Senden ↵</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB: BAND CONDITIONS -->
+    <div id="tab-bands" class="tab-content">
+        <div class="band-header">
+            <div>
+                <h3>Live Band Conditions</h3>
+                <p class="band-update-info" id="band-update-info">Lade Solardaten…</p>
+                <p class="data-source-badge" id="data-source-badge">Quellen: HamQSL · PSK Reporter (wie HamDash)</p>
+            </div>
+            <button class="btn-gray" onclick="loadBandConditions()">🔄 Aktualisieren</button>
+        </div>
+
+        <div class="solar-panel" id="solar-panel">
+            <div class="solar-item"><div class="solar-label">SFI (Solarfluss)</div><div class="solar-val" id="s-sfi">–</div></div>
+            <div class="solar-item"><div class="solar-label">A-Index</div><div class="solar-val" id="s-aindex">–</div></div>
+            <div class="solar-item"><div class="solar-label">K-Index</div><div class="solar-val" id="s-kindex">–</div></div>
+            <div class="solar-item"><div class="solar-label">Sunspot Zahl</div><div class="solar-val" id="s-sunspot">–</div></div>
+            <div class="solar-item"><div class="solar-label">Nördliches Aurora</div><div class="solar-val" id="s-aurora">–</div></div>
+            <div class="solar-item"><div class="solar-label">Signal-Noise</div><div class="solar-val" id="s-snoise">–</div></div>
+            <div class="solar-item"><div class="solar-label">Geomagnetik</div><div class="solar-val" id="s-geofield" style="font-size:0.95rem">–</div></div>
+            <div class="solar-item"><div class="solar-label">X-Ray</div><div class="solar-val" id="s-xray">–</div></div>
+        </div>
+
+        <table class="band-table">
+            <thead>
+                <tr><th>Band</th><th>Bereich</th><th>CW-Freq</th><th>Tag</th><th>Nacht</th><th>Jetzt</th><th>QRN</th><th>Info</th></tr>
+            </thead>
+            <tbody id="cond-tbody"></tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+// MORSE ALPHABET – letters, numbers, punctuation
+const morseAlphabet = {
+    'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.','G':'--.','H':'....','I':'..','J':'.---',
+    'K':'-.-','L':'.-..','M':'--','N':'-.','O':'---','P':'.--.','Q':'--.-','R':'.-.','S':'...','T':'-',
+    'U':'..-','V':'...-','W':'.--','X':'-..-','Y':'-.--','Z':'--..',
+    '1':'.----','2':'..---','3':'...--','4':'....-','5':'.....','6':'-....','7':'--...','8':'---..','9':'----.','0':'-----',
+    '.':'.-.-.-',',':'--..--','?':'..--..','/':'-..-.','=':'-...-','+':'.-.-.','@':'.--.-.',
+    ':':'---...',';':'-.-.-.','\'':'.----.','-':'-....-','_':'..--.-','(':'-.--.',')':'-.--.-',
+    '$':'...-..-','&':'.-...','!':'-.-.--','"':'.-..-.',' ':' '
+};
+const morseReverse = {};
+Object.entries(morseAlphabet).forEach(([k,v]) => { morseReverse[v] = k; });
+
+// Koch: easiest → hardest (length, then complexity)
+const kochSequence = [
+    'E','T','I','A','N','M','S','O','H','R','D','L','C','U','G','W','F','Y','P','B','V','K','J','X','Q','Z',
+    '1','2','3','4','5','6','7','8','9','0',
+    '.',',','?','/','=','+','@',':',';','\'','-','(',')','$','&','!'
+];
+
+const COOKIE_NAME = 'morseKochProgress_v13';
+
+function saveProgress() {
+    const data = {
+        currentLevel, introduced: [...introducedChars],
+        correctCount, totalCount, streak, currentWPM
+    };
+    const exp = new Date(Date.now() + 365 * 864e5).toUTCString();
+    document.cookie = `${COOKIE_NAME}=${encodeURIComponent(JSON.stringify(data))}; expires=${exp}; path=/; SameSite=Lax`;
+}
+
+function loadProgress() {
+    const match = document.cookie.match(new RegExp('(?:^|; )' + COOKIE_NAME + '=([^;]*)'));
+    if (!match) return false;
+    try {
+        const data = JSON.parse(decodeURIComponent(match[1]));
+        if (typeof data.currentLevel === 'number') currentLevel = Math.min(data.currentLevel, kochSequence.length - 1);
+        if (Array.isArray(data.introduced)) introducedChars = new Set(data.introduced.filter(c => kochSequence.includes(c)));
+        if (typeof data.correctCount === 'number') correctCount = data.correctCount;
+        if (typeof data.totalCount === 'number') totalCount = data.totalCount;
+        if (typeof data.streak === 'number') streak = data.streak;
+        if (typeof data.currentWPM === 'number') currentWPM = Math.min(35, Math.max(5, data.currentWPM));
+        return true;
+    } catch(e) { return false; }
+}
+
+function resetProgress() {
+    currentLevel = 0; introducedChars = new Set();
+    correctCount = 0; totalCount = 0; streak = 0; currentWPM = 20;
+    document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+    const slider = document.getElementById('wpm-slider');
+    if (slider) slider.value = currentWPM;
+    onWpmSlider(currentWPM);
+    updateKochProgress();
+    nextTask();
+}
+
+// TABS
+function switchTab(tabId, btn) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    if (btn) btn.classList.add('active');
+    if (tabId === 'tab-bands') loadBandConditions();
+    if (tabId === 'tab-qso') updateQsoPropPanel(document.getElementById('band-select').value);
+}
+
+// AUDIO
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTone(duration, freq=700, vol=0.12) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+    const att = 0.007, rel = 0.007;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(vol, now + att);
+    gain.gain.setValueAtTime(vol, now + Math.max(att + rel, duration - rel));
+    gain.gain.linearRampToValueAtTime(0, now + Math.max(att + rel + 0.001, duration));
+    osc.start(now);
+    osc.stop(now + duration + 0.01);
+}
+
+// VERBINDUNG
+let port = null, writer = null, bleDevice = null, bleCharTX = null;
+let connectionMode = null;
+
+function setConnected(mode, label) {
+    connectionMode = mode;
+    const badge = document.getElementById('conn-status');
+    badge.textContent = '🟢 ' + label;
+    badge.className = 'status-badge status-connected';
+    document.getElementById('btn-disconnect').style.display = 'inline-flex';
+}
+function setDisconnected() {
+    connectionMode = null; writer = null; bleCharTX = null;
+    const badge = document.getElementById('conn-status');
+    badge.textContent = '⚫ Nicht verbunden';
+    badge.className = 'status-badge';
+    document.getElementById('btn-disconnect').style.display = 'none';
+}
+
+async function disconnect() {
+    try {
+        if (port) { await port.close(); port = null; }
+        if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
+    } catch(e) {}
+    setDisconnected();
+}
+
+document.getElementById('btn-usb').addEventListener('click', async () => {
+    try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200 });
+
+        const textEncoder = new TextEncoderStream();
+        textEncoder.readable.pipeTo(port.writable);
+        writer = textEncoder.writable.getWriter();
+
+        setConnected('usb', 'USB Aktiv');
+
+        const decoder = new TextDecoderStream();
+        port.readable.pipeTo(decoder.writable);
+        const reader = decoder.readable.getReader();
+        (async () => {
+                    // Serial parser for the Arduino stream.
+                    // Arduino sends on KEY-DOWN (press), one '.' or '-' per click.
+                    // Ignore debug/status lines (newlines, "[BLE] …", spaces).
+            while (true) {
+                try {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (!value) continue;
+                    for (const ch of value) {
+                        if (ch === '.' || ch === '-') enqueueHardwareSignal(ch);
+                        // All other characters (newlines, "[BLE] …" status lines) are ignored.
+                    }
+                } catch(e) { break; }
+            }
+            setDisconnected();
+        })();
+    } catch(err) {
+        console.error(err);
+        alert('USB Verbindung fehlgeschlagen: ' + err.message);
+    }
+});
+
+document.getElementById('btn-ble').addEventListener('click', async () => {
+    try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        bleDevice = await navigator.bluetooth.requestDevice({
+            filters: [{ name: 'Arduino-MorseTrainer' }],
+            optionalServices: ['19b10000-e8f2-537e-4f6c-d104768a1214']
+        });
+        const server  = await bleDevice.gatt.connect();
+        const service = await server.getPrimaryService('19b10000-e8f2-537e-4f6c-d104768a1214');
+        const rxChar  = await service.getCharacteristic('19b10001-e8f2-537e-4f6c-d104768a1214');
+        bleCharTX     = await service.getCharacteristic('19b10002-e8f2-537e-4f6c-d104768a1214');
+
+        await rxChar.startNotifications();
+        rxChar.addEventListener('characteristicvaluechanged', (e) => {
+            const val = new TextDecoder().decode(e.target.value);
+            // Arduino sendet ggf. kurz ' ' vor '.'/'-' damit BLE auch
+            // wiederholte gleiche Symbole (z.B. "..") notifyt.
+            for (const ch of val) {
+                if (ch === '.' || ch === '-') enqueueHardwareSignal(ch);
+            }
+        });
+
+        bleDevice.addEventListener('gattserverdisconnected', () => setDisconnected());
+        setConnected('ble', 'BLE Aktiv');
+    } catch(err) {
+        console.error(err);
+        alert('BLE Fehler: ' + err.message);
+    }
+});
+
+async function sendToArduino(str) {
+    try {
+        if (writer)    await writer.write(str);
+        if (bleCharTX) await bleCharTX.writeValue(new TextEncoder().encode(str));
+    } catch(e) { console.warn('Send error:', e); }
+}
+
+// TRAINER – Koch-Methode mit Intro / Üben / Erinnerung
+
+let currentLevel      = 0;
+let targetChar        = '';
+let inputBuffer       = '';
+let currentWPM        = 20;
+let correctCount      = 0;
+let totalCount        = 0;
+let streak            = 0;
+let trainerLocked     = false;
+let inputTimeout      = null;
+let lastSignalTime    = 0;
+let trainerPhase      = 'train';   // 'intro' | 'train' | 'reminder'
+let introducedChars   = new Set(); // Zeichen mit abgeschlossener Einführung
+
+function updateKochProgress() {
+    const learned = currentLevel + 1;
+    const total = kochSequence.length;
+    const pct = Math.round((learned / total) * 100);
+    const bar = document.getElementById('koch-progress-bar');
+    const txt = document.getElementById('koch-progress-text');
+    if (bar) bar.style.width = pct + '%';
+    if (txt) txt.textContent = `${learned} / ${total} Zeichen (Level ${currentLevel + 1})`;
+}
+
+function setTrainerPhase(phase) {
+    trainerPhase = phase;
+    const badge = document.getElementById('trainer-phase-badge');
+    const area = document.getElementById('display-area');
+    const hintBtn = document.getElementById('hint-btn');
+    const introBtn = document.getElementById('btn-start-train');
+    badge.className = 'trainer-phase-badge ' + phase;
+    area.classList.remove('intro-mode', 'reminder-mode');
+    if (phase === 'intro') {
+        badge.textContent = 'Neues Zeichen lernen';
+        area.classList.add('intro-mode');
+        if (hintBtn) hintBtn.style.display = 'none';
+        if (introBtn) introBtn.classList.add('show');
+    } else if (phase === 'reminder') {
+        badge.textContent = 'Nochmal ansehen';
+        area.classList.add('reminder-mode');
+        if (hintBtn) hintBtn.style.display = 'none';
+        if (introBtn) introBtn.classList.remove('show');
+    } else {
+        badge.textContent = 'Aus dem Gedächtnis tippen';
+        if (hintBtn) hintBtn.style.display = 'inline-block';
+        if (introBtn) introBtn.classList.remove('show');
+    }
+}
+
+function setAudioWave(active) {
+    const w = document.getElementById('audio-wave');
+    if (w) w.classList.toggle('active', !!active);
+}
+
+function appendMorseSymbol(ch, index) {
+    const viz = document.getElementById('morse-viz');
+    if (index > 0) {
+        const gap = document.createElement('span');
+        gap.className = 'm-sym gap';
+        viz.appendChild(gap);
+    }
+    const span = document.createElement('span');
+    span.className = 'm-sym ' + (ch === '.' ? 'dot' : 'dash') + ' playing';
+    span.style.animationDelay = '0s';
+    viz.appendChild(span);
+    setTimeout(() => span.classList.remove('playing'), 350);
+}
+
+function renderMorseViz(code, animate = true) {
+    const viz = document.getElementById('morse-viz');
+    const textEl = document.getElementById('target-morse');
+    if (!code) {
+        viz.classList.add('hidden');
+        viz.innerHTML = '';
+        if (textEl) textEl.innerText = '';
+        return;
+    }
+    viz.classList.remove('hidden');
+    viz.innerHTML = '';
+    let delay = 0;
+    for (let i = 0; i < code.length; i++) {
+        const ch = code[i];
+        const span = document.createElement('span');
+        span.className = 'm-sym ' + (ch === '.' ? 'dot' : 'dash');
+        if (animate) {
+            span.style.animationDelay = (delay * 0.15) + 's';
+            delay++;
+        } else {
+            span.style.opacity = '1';
+            span.style.transform = 'scale(1)';
+        }
+        viz.appendChild(span);
+        if (i < code.length - 1) {
+            const gap = document.createElement('span');
+            gap.className = 'm-sym gap';
+            viz.appendChild(gap);
+        }
+    }
+    if (textEl) {
+        textEl.innerText = code;
+        textEl.classList.remove('reveal');
+        void textEl.offsetWidth;
+        textEl.classList.add('reveal');
+        textEl.style.color = trainerPhase === 'reminder' ? 'var(--danger)' : '#f59e0b';
+    }
+}
+
+function hideMorseDisplay() {
+    renderMorseViz('');
+    document.getElementById('intro-label').style.display = 'none';
+}
+
+async function playMorseCodeAnimated(code, wpm = 10) {
+    if (!code) return;
+    const viz = document.getElementById('morse-viz');
+    const textEl = document.getElementById('target-morse');
+    viz.classList.remove('hidden');
+    viz.innerHTML = '';
+    if (textEl) textEl.innerText = '';
+    setAudioWave(true);
+    const dotLen = 1.2 / wpm;
+    for (let i = 0; i < code.length; i++) {
+        const ch = code[i];
+        appendMorseSymbol(ch, i);
+        if (ch === '.') {
+            playTone(dotLen, 700, 0.14);
+            await sleep(dotLen * 1000 + 60);
+        } else if (ch === '-') {
+            playTone(dotLen * 3, 700, 0.14);
+            await sleep(dotLen * 3 * 1000 + 60);
+        }
+        if (i < code.length - 1) await sleep(dotLen * 1000);
+    }
+    if (textEl) {
+        textEl.innerText = code;
+        textEl.classList.add('reveal');
+        textEl.style.color = trainerPhase === 'reminder' ? 'var(--danger)' : '#f59e0b';
+    }
+    setAudioWave(false);
+}
+
+async function playMorseCode(code, wpm = 12) {
+    if (!code) return;
+    const dotLen = 1.2 / wpm;
+    setAudioWave(true);
+    for (const ch of code) {
+        if (ch === '.') { playTone(dotLen, 700, 0.14); await sleep(dotLen * 1000 + 80); }
+        else if (ch === '-') { playTone(dotLen * 3, 700, 0.14); await sleep(dotLen * 3 * 1000 + 80); }
+        await sleep(dotLen * 1000);
+    }
+    setAudioWave(false);
+}
+
+function popTargetChar() {
+    const el = document.getElementById('target-character');
+    el.classList.remove('char-pop');
+    void el.offsetWidth;
+    el.classList.add('char-pop');
+}
+
+async function startIntroPhase() {
+    setTrainerPhase('intro');
+    trainerLocked = true;
+    const code = morseAlphabet[targetChar] || '';
+    document.getElementById('intro-label').style.display = 'block';
+    document.getElementById('intro-label').innerText =
+        `Neues Zeichen „${targetChar}" – schau die Punkte & Striche an und höre den Code!`;
+    popTargetChar();
+    await sleep(300);
+    await playMorseCodeAnimated(code, 10);
+    renderMorseViz(code, true);
+}
+
+function finishIntro() {
+    introducedChars.add(targetChar);
+    saveProgress();
+    startTrainPhase();
+}
+
+function startTrainPhase(fromReminder = false) {
+    setTrainerPhase('train');
+    trainerLocked = false;
+    inputBuffer = '';
+    morseDecoder.reset();
+    document.getElementById('live-input').innerHTML = '&#8203;';
+    hideMorseDisplay();
+    if (!fromReminder) {
+        document.getElementById('target-morse').innerText = '';
+    }
+}
+
+async function startReminderPhase() {
+    setTrainerPhase('reminder');
+    trainerLocked = true;
+    inputBuffer = '';
+    morseDecoder.reset();
+    document.getElementById('live-input').innerHTML = '&#8203;';
+    const code = morseAlphabet[targetChar] || '';
+    document.getElementById('intro-label').style.display = 'block';
+    document.getElementById('intro-label').innerText =
+        `Nicht ganz – „${targetChar}" ist ${code}. Nochmal ansehen & anhören!`;
+    popTargetChar();
+    await playMorseCodeAnimated(code, 10);
+    renderMorseViz(code, true);
+    await sleep(800);
+    startTrainPhase(true);
+}
+
+function pickTargetChar() {
+    const newestChar = kochSequence[currentLevel];
+    if (!introducedChars.has(newestChar)) return newestChar;
+    const pool = kochSequence.slice(0, currentLevel + 1).filter(c => introducedChars.has(c));
+    if (!pool.length) return newestChar;
+    const weightedPool = [...pool, newestChar, newestChar, newestChar];
+    return weightedPool[Math.floor(Math.random() * weightedPool.length)];
+}
+
+function burstLevelUp() {
+    const host = document.getElementById('level-up-burst');
+    if (!host) return;
+    host.innerHTML = '';
+    for (let i = 0; i < 18; i++) {
+        const p = document.createElement('span');
+        const angle = (i / 18) * Math.PI * 2;
+        const dist = 80 + Math.random() * 60;
+        p.style.left = '50%'; p.style.top = '50%';
+        p.style.setProperty('--bx', Math.cos(angle) * dist + 'px');
+        p.style.setProperty('--by', Math.sin(angle) * dist + 'px');
+        p.style.animationDelay = (Math.random() * 0.15) + 's';
+        host.appendChild(p);
+    }
+    const bar = document.getElementById('koch-progress-bar');
+    if (bar) { bar.classList.add('level-up'); setTimeout(() => bar.classList.remove('level-up'), 1000); }
+}
+
+// ---------- Morse-Timing & Advanced Debounce ----------
+// MUSS mit CHAR_TIMEOUT_* im .ino übereinstimmen
+const ARDUINO_CHAR_TIMEOUT       = 380;
+const ARDUINO_CHAR_TIMEOUT_AMBIG = 620;
+const HW_EVAL_BUFFER_MS          = 100;
+
+function isMorsePrefix(buf) {
+    if (!buf) return false;
+    for (const [ch, code] of Object.entries(morseAlphabet)) {
+        if (ch === ' ') continue;
+        if (code.startsWith(buf) && code.length > buf.length) return true;
+    }
+    return false;
+}
+
+function dotMs(wpm = currentWPM) { return 1200 / wpm; }
+
+// PARIS-Standard: 3 Einheiten Pause = Buchstabe fertig
+function letterGapMs(wpm = currentWPM) {
+    return Math.max(220, Math.round(3.2 * dotMs(wpm)));
+}
+
+function elementGapMs(wpm = currentWPM) {
+    return Math.round(1.15 * dotMs(wpm));
+}
+
+function updateDebounceDisplay() {
+    const kbMs = letterGapMs();
+    const hwMs = ARDUINO_CHAR_TIMEOUT_AMBIG + HW_EVAL_BUFFER_MS;
+    const el = document.getElementById('wpm-delay-ms');
+    if (el) el.textContent = kbMs;
+    const vd = document.getElementById('val-debounce');
+    if (vd) vd.textContent = kbMs + 'ms';
+    const hwEl = document.getElementById('val-hw-debounce');
+    if (hwEl) hwEl.textContent = hwMs + 'ms';
+}
+
+function onWpmSlider(val) {
+    currentWPM = parseInt(val, 10);
+    document.getElementById('val-wpm').innerText = currentWPM;
+    const span = document.getElementById('wpm-display');
+    span.innerHTML = `${currentWPM} WPM — Tastatur: <strong id="wpm-delay-ms">${letterGapMs()}</strong> ms · Arduino: <strong>${ARDUINO_CHAR_TIMEOUT_AMBIG + HW_EVAL_BUFFER_MS}</strong> ms`;
+    updateDebounceDisplay();
+}
+
+// Adaptiver Decoder: lernt aus Abständen zwischen Symbolen
+const morseDecoder = {
+    signalTimes: [],
+
+    reset() {
+        this.signalTimes = [];
+    },
+
+    recordSignal() {
+        this.signalTimes.push(Date.now());
+        if (this.signalTimes.length > 12) this.signalTimes.shift();
+    },
+
+    evalDelayMs(fromHardware, wpm, buffer = '') {
+        if (fromHardware) {
+            const base = isMorsePrefix(buffer)
+                ? ARDUINO_CHAR_TIMEOUT_AMBIG
+                : ARDUINO_CHAR_TIMEOUT;
+            return base + HW_EVAL_BUFFER_MS;
+        }
+        const times = this.signalTimes;
+        if (times.length >= 3) {
+            const gaps = [];
+            for (let i = 1; i < times.length; i++) gaps.push(times[i] - times[i - 1]);
+            gaps.sort((a, b) => a - b);
+            const medianGap = gaps[Math.floor(gaps.length / 2)];
+            // Pause deutlich länger als typischer Element-Abstand → Buchstabe fertig
+            const adaptive = Math.round(medianGap * 3.2 + elementGapMs(wpm));
+            return Math.max(letterGapMs(wpm), Math.min(adaptive, letterGapMs(wpm) * 2.2));
+        }
+        return letterGapMs(wpm);
+    }
+};
+
+// Hardware-Signal-Queue (seriell/BLE, ein Symbol pro Druck)
+let hwQueue = [];
+let hwProcessing = false;
+
+async function enqueueHardwareSignal(signal) {
+    hwQueue.push(signal);
+    if (!hwProcessing) processHwQueue();
+}
+
+async function processHwQueue() {
+    hwProcessing = true;
+    while (hwQueue.length > 0) {
+        const sig = hwQueue.shift();
+        processIncomingSignal(sig, true);
+        // Kurze Pause zwischen Symbolen aus demselben Burst
+        if (hwQueue.length > 0) await sleep(2);
+    }
+    hwProcessing = false;
+}
+// ----------------------------------------
+
+function nextTask() {
+    trainerLocked = false;
+    clearTimeout(inputTimeout);
+    inputTimeout = null;
+    lastSignalTime = 0;
+    hwQueue = [];
+    hwProcessing = false;
+    morseDecoder.reset();
+    document.getElementById('locked-overlay').classList.remove('show');
+    document.getElementById('display-area').classList.remove('success-flash', 'fail-shake');
+    document.getElementById('display-area').style.background = '';
+
+    targetChar = pickTargetChar();
+    document.getElementById('target-character').innerText = targetChar;
+    popTargetChar();
+    inputBuffer = '';
+    document.getElementById('live-input').innerHTML = '&#8203;';
+    updateKochProgress();
+
+    const needsIntro = !introducedChars.has(targetChar);
+    if (needsIntro) {
+        startIntroPhase();
+    } else {
+        startTrainPhase();
+    }
+
+    sendToArduino(targetChar);
+}
+
+function showHint() {
+    if (trainerPhase === 'intro') return;
+    const code = morseAlphabet[targetChar] || '';
+    renderMorseViz(code, true);
+    document.getElementById('target-morse').style.color = 'var(--accent)';
+    streak = 0;
+    document.getElementById('val-streak').innerText = 0;
+    playMorseCode(code, 12);
+}
+
+// fromHardware=true  → Arduino/BLE: festes Timeout (sync mit .ino)
+// fromHardware=false → Tastatur: adaptiver PARIS-basierter Debounce
+function processIncomingSignal(signal, fromHardware = false) {
+    if (trainerLocked || trainerPhase === 'intro') return;
+
+    const now = Date.now();
+
+    // Tastatur-Glitchfilter (nur KB, nicht Hardware)
+    if (!fromHardware) {
+        if (inputBuffer.length > 0 && (now - lastSignalTime) < 30) return;
+    }
+    lastSignalTime = now;
+    morseDecoder.recordSignal();
+
+    playTone(signal === '.' ? 0.06 : 0.2);
+
+    inputBuffer += signal;
+    const liveEl = document.getElementById('live-input');
+    liveEl.innerText = inputBuffer;
+    liveEl.classList.remove('signal-pulse');
+    void liveEl.offsetWidth;
+    liveEl.classList.add('signal-pulse');
+
+    if (trainerPhase === 'train') {
+        hideMorseDisplay();
+    }
+
+    clearTimeout(inputTimeout);
+    const evalDelay = morseDecoder.evalDelayMs(fromHardware, currentWPM, inputBuffer);
+    inputTimeout = setTimeout(() => evaluateInput(), evalDelay);
+
+    if (qsoPhase === 'tx' || qsoPhase === 'wait_reply' || qsoPhase === 'exchange') {
+        qsoTxBuffer += signal;
+    }
+}
+
+function evaluateInput() {
+    if (trainerLocked || trainerPhase === 'intro' || inputBuffer.length === 0) return;
+    trainerLocked = true;
+    morseDecoder.reset();
+    document.getElementById('locked-overlay').classList.add('show');
+
+    const targetMorse = morseAlphabet[targetChar] || '';
+    const correct = (inputBuffer === targetMorse);
+    const area = document.getElementById('display-area');
+
+    renderMorseViz(targetMorse, !correct);
+    document.getElementById('target-morse').style.color = correct ? 'var(--accent)' : 'var(--danger)';
+    document.getElementById('intro-label').style.display = 'none';
+
+    area.classList.remove('success-flash', 'fail-shake');
+    void area.offsetWidth;
+
+    if (correct) {
+        totalCount++; correctCount++; streak++;
+        if (streak > 0 && streak % 5 === 0) currentWPM = Math.min(currentWPM + 1, 35);
+        area.style.background = 'rgba(16,185,129,0.2)';
+        area.classList.add('success-flash');
+    } else {
+        totalCount++; streak = 0;
+        document.getElementById('live-input').innerText = inputBuffer + '  ≠  ' + targetMorse;
+        area.style.background = 'rgba(239,68,68,0.2)';
+        area.classList.add('fail-shake');
+    }
+
+    const acc = totalCount > 0 ? correctCount / totalCount : 1;
+    let leveledUp = false;
+    if (correct && acc >= 0.9 && totalCount >= 8 && currentLevel < kochSequence.length - 1) {
+        currentLevel++;
+        totalCount = 0; correctCount = 0;
+        leveledUp = true;
+        burstLevelUp();
+    }
+
+    const slider = document.getElementById('wpm-slider');
+    if (slider) slider.value = currentWPM;
+    onWpmSlider(currentWPM);
+
+    document.getElementById('val-accuracy').innerText = totalCount > 0 ? Math.round(acc * 100) + '%' : '–';
+    document.getElementById('val-streak').innerText = streak;
+    document.getElementById('val-level').innerText = currentLevel + 1;
+    updateKochProgress();
+    saveProgress();
+
+    if (correct) {
+        setTimeout(nextTask, leveledUp ? 1200 : 600);
+    } else {
+        setTimeout(async () => {
+            document.getElementById('locked-overlay').classList.remove('show');
+            await startReminderPhase();
+        }, 900);
+    }
+}
+
+// Use keyup → fires exactly ONCE per physical keypress, no OS key-repeat phantoms
+document.addEventListener('keyup', (e) => {
+    // In the QSO tx-input: intercept . and - as morse signals instead of text
+    if (e.target.id === 'tx-input') {
+        if (e.key === '.' || e.key === ',') {
+            e.preventDefault();
+            processIncomingSignal('.', false);
+        } else if (e.key === '-' || e.key === '_') {
+            e.preventDefault();
+            processIncomingSignal('-', false);
+        }
+        return;
+    }
+    // Everywhere else (not in any other input/textarea)
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === '.' || e.key === ',') processIncomingSignal('.', false);
+    if (e.key === '-' || e.key === '_') processIncomingSignal('-', false);
+});
+
+// QSO SIMULATOR – realistisch mit Live-Propagation
+let qsoActive       = false;
+let qsoPhase        = 'idle';
+let noiseSource     = null;
+let smeterInterval  = null;
+let qsoTxBuffer     = '';
+let qsoStep         = 0;
+let dxCallsign      = '';
+let dxName          = '';
+let dxQth           = '';
+let qsoCond         = null;
+let myCallsign      = () => (document.getElementById('my-callsign').value.trim().toUpperCase() || 'DL1ABC');
+
+const DX_CALLS = [
+    'DL8XYZ','W1AW','F5NAN','G3ZZZ','EA4DEI','OE5TXF','PA3GVI','SM5COP','OH2BH','JA1ZGP',
+    'VK2IO','ZL2BCB','LU3HY','PY5EG','HA8IH','OK2BNC','SP5CCC','YO3GD','I2RTF','HB9CV',
+    'UA9XQT','4X4DK','JH1NBN','K7GS','N0AX','VE3SWA','ZS6BRZ','RA3LA','DK5AI','G4BUO'
+];
+const DX_NAMES = ['FRED','BOB','HANS','PIERRE','JOE','ALEX','IVAN','KEN','LARS','MIKE','TOM','STEVE'];
+const DX_QTHS  = ['BERLIN','MUNICH','PARIS','LONDON','VIENNA','PRAGUE','RIGA','OSLO','MADRID','ROME'];
+const BAND_FREQS = {
+    '160m':'1.810 MHz','80m':'3.510 MHz','60m':'5.357 MHz','40m':'7.010 MHz',
+    '30m':'10.106 MHz','20m':'14.010 MHz','17m':'18.069 MHz','15m':'21.010 MHz',
+    '12m':'24.895 MHz','10m':'28.010 MHz','11m':'27.555 MHz'
+};
+
+const BAND_PSK_RANGE = {
+    '160m':'1800000-2000000','80m':'3500000-4000000','60m':'5351000-5367000',
+    '40m':'7000000-7300000','30m':'10100000-10150000','20m':'14000000-14350000',
+    '17m':'18068000-18168000','15m':'21000000-21450000','12m':'24890000-24990000',
+    '10m':'28000000-29700000','11m':'26965000-27405000'
+};
+
+function updateQsoPropPanel(band) {
+    const cond = getBandCondNow(band);
+    qsoCond = cond;
+    const set = (id, txt, cls) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = txt;
+        el.className = 'qso-prop-val' + (cls ? ' ' + cls : '');
+    };
+    set('qp-status', cond.open ? (cond.labelDe || 'Offen') : 'Geschlossen', cond.open ? '' : 'closed');
+    set('qp-solar', solarData ? `${solarData.sfi} / K${solarData.kindex}` : 'Offline', solarData ? '' : 'weak');
+    set('qp-signal', cond.open ? `S${cond.s}` : '–', cond.s <= 3 ? 'weak' : '');
+    set('qp-noise', `QRN S${cond.noise} · QSB ${cond.qsbLabel}`);
+    set('qp-wpm', cond.open ? `${cond.wpmMin}–${cond.wpmMax} WPM` : '–');
+    set('qp-prop', (cond.pskSpots != null ? `${cond.pskSpots} CW-Spots · ` : '') + (cond.propLabel || '–'));
+
+    const hint = document.getElementById('qso-band-hint');
+    const rig = document.getElementById('rig-display');
+    if (rig) rig.textContent = `RX: ${BAND_FREQS[band] || band} · Filter: 500 Hz · Mode: CW · ${cond.open ? 'Band offen' : 'Band tot'}`;
+    if (hint) {
+        if (!cond.open) {
+            hint.className = 'qso-band-hint closed';
+            hint.textContent = `${band}: Band laut HamQSL derzeit geschlossen/schlecht (${cond.labelDe}). Nur Rauschen – kein QSO möglich. Probiere ${suggestOpenBand()}.`;
+        } else if (cond.s <= 3) {
+            hint.className = 'qso-band-hint';
+            hint.textContent = `${band}: Schwaches Signal (${cond.labelDe}) – viel QSB und QRN. Langsam und deutlich senden!`;
+        } else {
+            hint.className = 'qso-band-hint';
+            hint.textContent = `${band}: Gute Bedingungen (${cond.labelDe}, S${cond.s}${cond.pskSpots != null ? ', ' + cond.pskSpots + ' PSK-Spots/h' : ''}). DX ${dxCallsign || '…'} sollte gut hörbar sein.`;
+        }
+    }
+}
+
+function suggestOpenBand() {
+    let best = '20m', bestS = -1;
+    for (const def of BAND_DEFS) {
+        const c = getBandCondNow(def.band);
+        if (c.open && c.s > bestS) { bestS = c.s; best = def.band; }
+    }
+    return bestS >= 0 ? best + ' (S' + bestS + ')' : '20m oder 40m';
+}
+
+document.getElementById('band-select').addEventListener('change', (e) => {
+    updateQsoPropPanel(e.target.value);
+});
+
+function logQSO(text, cls='rx') {
+    const log = document.getElementById('qso-log');
+    const span = document.createElement('span');
+    span.className = cls;
+    span.textContent = text;
+    log.appendChild(span);
+    log.appendChild(document.createElement('br'));
+    log.scrollTop = log.scrollHeight;
+}
+
+function setQsoPhase(phase) {
+    qsoPhase = phase;
+    const badge = document.getElementById('qso-phase-badge');
+    const txArea = document.getElementById('tx-area');
+    if (phase === 'wait_reply' || phase === 'exchange') {
+        badge.textContent = '📤 TX – Deine Antwort'; badge.className = 'qso-phase-badge tx';
+        txArea.style.display = 'flex';
+        document.getElementById('tx-input').focus();
+    } else if (phase === 'cq_rx') {
+        badge.textContent = '📡 RX – Empfang'; badge.className = 'qso-phase-badge rx';
+        txArea.style.display = 'none';
+    } else {
+        badge.textContent = 'Bereit'; badge.className = 'qso-phase-badge';
+        txArea.style.display = 'none';
+    }
+}
+
+async function startQSO() {
+    if (qsoActive) stopQSO();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    if (!solarData || Date.now() - lastFetch > 15 * 60 * 1000) {
+        logQSO('[System] Lade Live-Bandausbreitung (HamQSL + PSK Reporter)…', 'sys');
+        await loadBandConditions();
+    }
+
+    qsoActive = true;
+    qsoStep   = 0;
+    dxCallsign = DX_CALLS[Math.floor(Math.random() * DX_CALLS.length)];
+    dxName = DX_NAMES[Math.floor(Math.random() * DX_NAMES.length)];
+    dxQth  = DX_QTHS[Math.floor(Math.random() * DX_QTHS.length)];
+
+    const band = document.getElementById('band-select').value;
+    updateQsoPropPanel(band);
+    const cond = getBandCondNow(band);
+    const freq = BAND_FREQS[band] || '14.010 MHz';
+
+    document.getElementById('cw-waterfall').style.display = qsoActive ? 'block' : 'none';
+    logQSO(`[System] ${freq} · Propagation: ${cond.propLabel}${cond.pskSpots != null ? ' · ' + cond.pskSpots + ' CW/FT8 spots (PSK)' : ''} · SFI ${solarData?.sfi ?? '?'} K${solarData?.kindex ?? '?'}`, 'sys');
+    logQSO(`[System] Band ${cond.open ? 'OFFEN' : 'GESCHLOSSEN'} – ${cond.labelDe}`, cond.open ? 'sys' : 'err');
+
+    startNoise(cond.noise, cond.qsbDepth);
+
+    smeterInterval = setInterval(() => {
+        if (!qsoCond) return;
+        const base = qsoCond.s * 10;
+        const qsb = (Math.sin(Date.now() / (800 + qsoCond.qsbDepth * 200)) * qsoCond.qsbDepth * 3);
+        const jitter = (Math.random() * 8) - 4;
+        const pct = Math.max(0, Math.min(100, base + qsb + jitter));
+        document.getElementById('smeter-bar').style.width = pct + '%';
+        document.getElementById('smeter-val').innerText = 'S' + Math.max(0, Math.round(pct / 10));
+    }, 150);
+
+    if (!cond.open || cond.s <= 1) {
+        logQSO('[!] Band zu schwach/geschlossen – nur Atmosphärisch-Rauschen hörbar.', 'err');
+        logQSO(`[Tipp] Wechsle auf ${suggestOpenBand()} und starte erneut.`, 'sys');
+        setQsoPhase('idle');
+        return;
+    }
+
+    setQsoPhase('cq_rx');
+    logQSO(`[RX] ${dxCallsign} (${dxQth}) ruft gleich CQ…`, 'sys');
+    await sleep(1500 + Math.random() * 1500);
+    await playAndLogCw(`CQ CQ DE ${dxCallsign} ${dxCallsign} PSE K`, cond);
+    if (!qsoActive) return;
+
+    setQsoPhase('wait_reply');
+    logQSO('[System] Antworte mit deinem Rufzeichen (Morse oder Textfeld)!', 'sys');
+    logQSO(`[Tipp] ${dxCallsign} DE ${myCallsign()} ${myCallsign()} K`, 'sys');
+    qsoTxBuffer = '';
+    qsoStep = 1;
+}
+
+async function sendQsoReply() {
+    let inp = document.getElementById('tx-input').value.trim().toUpperCase();
+    if (!inp && qsoTxBuffer) {
+        inp = decodeMorseBuffer(qsoTxBuffer);
+        qsoTxBuffer = '';
+    }
+    if (!inp) return;
+    document.getElementById('tx-input').value = '';
+    logQSO(`[TX] ${inp}`, 'tx');
+    await continueQso(inp);
+}
+
+function decodeMorseBuffer(buf) {
+    let result = '', word = '';
+    for (const ch of buf) {
+        if (ch === ' ') { if (word) { result += morseReverse[word] || '?'; word = ''; } result += ' '; }
+        else word += ch;
+    }
+    if (word) result += morseReverse[word] || '?';
+    return result.trim();
+}
+
+async function continueQso(userReply) {
+    if (!qsoActive) return;
+    const band = document.getElementById('band-select').value;
+    const cond = getBandCondNow(band);
+    const me = myCallsign();
+
+    if (qsoStep === 1) {
+        const heard = userReply.includes(me) || userReply.includes(me.substring(0, 4));
+        if (!heard && cond.s >= 5) {
+            logQSO('[RX] QRZ? QRZ?', 'rx');
+            await playAndLogCw('QRZ QRZ', cond);
+            return;
+        }
+        const rst = cond.s >= 7 ? '599' : (cond.s >= 4 ? '579' : '559');
+        setQsoPhase('cq_rx');
+        await sleep(800 + Math.random() * 1200);
+        await playAndLogCw(`${me} DE ${dxCallsign} GE ${me} UR RST ${rst} ${rst} NAME ${dxName} QTH ${dxQth} BT`, cond);
+        if (!qsoActive) return;
+        setQsoPhase('exchange');
+        logQSO('[System] Sende RST, Name und QTH zurück!', 'sys');
+        logQSO(`[Tipp] ${dxCallsign} DE ${me} FB RST 599 599 NAME ANNA QTH MUNICH TU`, 'sys');
+        qsoStep = 2;
+    } else if (qsoStep === 2) {
+        setQsoPhase('cq_rx');
+        await sleep(600 + Math.random() * 800);
+        await playAndLogCw(`FB TU AGN ${me} 73 GL DE ${dxCallsign} SK SK`, cond);
+        if (!qsoActive) return;
+        logQSO('[System] QSO abgeschlossen – 73!', 'sys');
+        await sleep(2000);
+        if (!qsoActive) return;
+        qsoStep = 0;
+        dxCallsign = DX_CALLS[Math.floor(Math.random() * DX_CALLS.length)];
+        dxName = DX_NAMES[Math.floor(Math.random() * DX_NAMES.length)];
+        dxQth  = DX_QTHS[Math.floor(Math.random() * DX_QTHS.length)];
+        setQsoPhase('cq_rx');
+        logQSO(`[RX] Neuer Caller: ${dxCallsign}…`, 'sys');
+        await sleep(2500 + Math.random() * 2000);
+        if (!qsoActive) return;
+        await playAndLogCw(`CQ CQ DE ${dxCallsign} K`, cond);
+        if (!qsoActive) return;
+        setQsoPhase('wait_reply');
+        qsoStep = 1;
+    }
+}
+
+document.getElementById('tx-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { sendQsoReply(); return; }
+    // Prevent . and - from being typed as literal characters into the text field
+    // They will be handled as morse by the keyup listener above
+    if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === '_') {
+        e.preventDefault();
+    }
+});
+
+function stopQSO() {
+    qsoActive = false;
+    stopNoise();
+    if (smeterInterval) { clearInterval(smeterInterval); smeterInterval = null; }
+    document.getElementById('smeter-bar').style.width = '0%';
+    document.getElementById('smeter-val').innerText = 'S0';
+    document.getElementById('cw-waterfall').style.display = 'none';
+    setQsoPhase('idle');
+    logQSO('[System] RX gestoppt.', 'sys');
+}
+
+function startNoise(noiseLevel, qsbDepth = 0.3) {
+    stopNoise();
+    if (noiseLevel <= 0) return;
+
+    const vol = (noiseLevel / 9) * 0.06;
+
+    // --- White noise base (band noise / QRN) ---
+    const bufSize = audioCtx.sampleRate * 2;
+    const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+
+    noiseSource = audioCtx.createBufferSource();
+    noiseSource.buffer = buf;
+    noiseSource.loop = true;
+
+    // Narrow bandpass filter centered on CW passband (~700 Hz)
+    const bpf = audioCtx.createBiquadFilter();
+    bpf.type = 'bandpass'; bpf.frequency.value = 700; bpf.Q.value = 4;
+
+    const noiseGain = audioCtx.createGain();
+    noiseGain.gain.value = vol;
+
+    noiseSource.connect(bpf);
+    bpf.connect(noiseGain);
+    noiseGain.connect(audioCtx.destination);
+    noiseSource.start();
+
+    // --- Atmospheric crackling (QRN bursts) ---
+    const crackleInterval = setInterval(() => {
+        if (!noiseSource) { clearInterval(crackleInterval); return; }
+        if (Math.random() < 0.35 * (noiseLevel / 9)) {
+            const crackBuf = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * 0.04), audioCtx.sampleRate);
+            const cd = crackBuf.getChannelData(0);
+            for (let i = 0; i < cd.length; i++) cd[i] = (Math.random() * 2 - 1) * (1 - i / cd.length);
+            const src = audioCtx.createBufferSource();
+            src.buffer = crackBuf;
+            const cg = audioCtx.createGain();
+            cg.gain.value = vol * 2.5;
+            src.connect(cg); cg.connect(audioCtx.destination);
+            src.start();
+        }
+    }, 600 + Math.random() * 900);
+
+    // Store crackle interval so we can clear it
+    noiseSource._crackleInterval = crackleInterval;
+
+    // --- QRM: random interfering CW carrier (only on higher noise) ---
+    if (noiseLevel >= 4) {
+        const qrmOsc = audioCtx.createOscillator();
+        const qrmGain = audioCtx.createGain();
+        qrmOsc.type = 'sine';
+        qrmOsc.frequency.value = 680 + Math.random() * 80; // nearby station
+        qrmGain.gain.value = 0;
+        qrmOsc.connect(qrmGain);
+        qrmGain.connect(audioCtx.destination);
+        qrmOsc.start();
+
+        // Slowly pulse the QRM in and out (simulates fading interference)
+        let qrmFadeDir = 1;
+        const qrmInterval = setInterval(() => {
+            if (!noiseSource) { clearInterval(qrmInterval); try { qrmOsc.stop(); } catch(e){} return; }
+            const target = qrmFadeDir > 0 ? vol * 0.6 : 0;
+            qrmGain.gain.linearRampToValueAtTime(target, audioCtx.currentTime + 2.5);
+            if (Math.random() < 0.5) qrmFadeDir *= -1;
+        }, 3000);
+        noiseSource._qrmOsc = qrmOsc;
+        noiseSource._qrmInterval = qrmInterval;
+    }
+}
+
+function stopNoise() {
+    if (noiseSource) {
+        try { noiseSource.stop(); } catch(e){}
+        if (noiseSource._crackleInterval) clearInterval(noiseSource._crackleInterval);
+        if (noiseSource._qrmInterval)     clearInterval(noiseSource._qrmInterval);
+        if (noiseSource._qrmOsc)          try { noiseSource._qrmOsc.stop(); } catch(e){}
+        noiseSource = null;
+    }
+}
+
+async function playAndLogCw(text, cond) {
+    const signalS = typeof cond === 'object' ? cond.s : cond;
+    logQSO(`[RX] ${text}`, 'rx');
+
+    const wpm = typeof cond === 'object'
+        ? cond.wpmMin + Math.random() * (cond.wpmMax - cond.wpmMin)
+        : 14 + Math.random() * 8;
+    const dotLen = 1.2 / wpm;
+    const volBase = Math.max(0.02, (signalS / 9) * 0.38);
+    const dropRate = typeof cond === 'object' ? cond.charDropRate : 0;
+
+    const osc  = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const bpf  = audioCtx.createBiquadFilter();
+    const lfo  = audioCtx.createOscillator();
+    const lfoGain = audioCtx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.value = 720 + (Math.random() * 60 - 30);
+    bpf.type = 'bandpass'; bpf.frequency.value = 800; bpf.Q.value = 5;
+
+    const qsbDepth = typeof cond === 'object' ? cond.qsbDepth : 0.3;
+    const fadeDepth = Math.min(0.5, qsbDepth + (10 - signalS) * 0.03);
+    lfo.type = 'sine';
+    lfo.frequency.value = 0.12 + Math.random() * 0.25;
+    lfoGain.gain.value = volBase * fadeDepth;
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(gain.gain);
+    osc.connect(gain); gain.connect(bpf); bpf.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    osc.start(audioCtx.currentTime);
+    lfo.start(audioCtx.currentTime);
+
+    let t = audioCtx.currentTime + 0.05;
+    for (const ch of text.toUpperCase()) {
+        if (!qsoActive) break;
+        if (ch === ' ') { t += dotLen * 7; continue; }
+        if (dropRate > 0 && Math.random() < dropRate) { t += dotLen * 4; continue; }
+        const code = morseAlphabet[ch] || '';
+        for (const sym of code) {
+            const len = sym === '.' ? dotLen : dotLen * 3;
+            gain.gain.setTargetAtTime(volBase * (0.7 + Math.random() * 0.3), t, 0.005);
+            gain.gain.setTargetAtTime(0, t + len - 0.007, 0.005);
+            t += len + dotLen;
+        }
+        t += dotLen * 2;
+    }
+    lfo.stop(t + 0.1);
+    osc.stop(t + 0.1);
+    await sleep((t - audioCtx.currentTime) * 1000 + 200);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// BAND CONDITIONS
+let solarData = null;
+let pskBandData = {};
+let lastFetch = 0;
+let lastPskFetch = 0;
+let dataSourceInfo = { solar: '', psk: '' };
+
+const CORS_PROXIES = [
+    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+    url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+    url => `https://thingproxy.freeboard.io/fetch/${url}`,
+    url => `https://proxy.cors.sh/${url}`,
+    url => `https://cors.eu.org/${url}`,
+    url => `https://yacdn.org/proxy/${url}`,
+];
+
+async function fetchWithMirrors(targetUrl, opts = {}) {
+    const timeout = opts.timeout || 7000;
+    for (const makeUrl of CORS_PROXIES) {
+        try {
+            const proxyUrl = makeUrl(targetUrl);
+            const resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeout) });
+            if (!resp.ok) continue;
+            const ct = resp.headers.get('content-type') || '';
+            let body;
+            if (ct.includes('json') && !targetUrl.includes('.json')) {
+                const j = await resp.json();
+                body = j.contents ?? j.data ?? j;
+                if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
+                    return { ok: true, json: body, mirror: new URL(proxyUrl).hostname };
+                }
+                if (typeof body === 'string') return { ok: true, text: body, mirror: new URL(proxyUrl).hostname };
+            } else if (ct.includes('json')) {
+                return { ok: true, json: await resp.json(), mirror: new URL(proxyUrl).hostname };
+            } else {
+                return { ok: true, text: await resp.text(), mirror: new URL(proxyUrl).hostname };
+            }
+        } catch(e) { console.warn('Mirror failed:', e.message); }
+    }
+    return { ok: false };
+}
+
+const BAND_DEFS = [
+    { band:'160m', freq:'1.800–2.000 MHz',  cw:'1.810 MHz', dayBase:1,  nightBase:4,  dayCond:'Sehr schlecht', nightCond:'Regional (500km)',  desc:'Topband – nur nachts regional, selten DX', noise:9 },
+    { band:'80m',  freq:'3.500–3.800 MHz',  cw:'3.510 MHz', dayBase:2,  nightBase:7,  dayCond:'Regional',      nightCond:'DX möglich',        desc:'Abend/Nacht-Band, Europa & DX nachts', noise:7 },
+    { band:'60m',  freq:'5.351–5.367 MHz',  cw:'–',         dayBase:3,  nightBase:5,  dayCond:'Regional',      nightCond:'Kontinent',         desc:'Nur ITU-Kanäle, begrenzte Leistung', noise:6 },
+    { band:'40m',  freq:'7.000–7.200 MHz',  cw:'7.010 MHz', dayBase:5,  nightBase:8,  dayCond:'Europa',        nightCond:'DX / Weltweit',     desc:'Bestes Allround-Band, tagsüber Europa, nachts DX', noise:5 },
+    { band:'30m',  freq:'10.100–10.150 MHz',cw:'10.106 MHz',dayBase:6,  nightBase:6,  dayCond:'DX / Gut',      nightCond:'DX / Gut',          desc:'WARC-Band, nur CW/Daten, kein SSB', noise:4 },
+    { band:'20m',  freq:'14.000–14.350 MHz',cw:'14.010 MHz',dayBase:7,  nightBase:4,  dayCond:'Weltweit',      nightCond:'Mäßig',             desc:'Das DX-Band par excellence, tags hervorragend', noise:3 },
+    { band:'17m',  freq:'18.068–18.168 MHz',cw:'18.069 MHz',dayBase:6,  nightBase:3,  dayCond:'Gut / DX',      nightCond:'Schwach',           desc:'WARC-Band, ruhig, wenig Pileuups', noise:3 },
+    { band:'15m',  freq:'21.000–21.450 MHz',cw:'21.010 MHz',dayBase:5,  nightBase:1,  dayCond:'DX (solar)',    nightCond:'Geschlossen',       desc:'Zyklus-abhängig, bei hohem SFI sehr gut', noise:2 },
+    { band:'12m',  freq:'24.890–24.990 MHz',cw:'24.895 MHz',dayBase:3,  nightBase:0,  dayCond:'Variabel',      nightCond:'Geschlossen',       desc:'WARC-Band, öffnet nur bei gutem SFI', noise:2 },
+    { band:'11m',  freq:'26.965–27.405 MHz',cw:'27.555 MHz',dayBase:4,  nightBase:2,  dayCond:'Regional/CB',   nightCond:'Regional',          desc:'11m CB/Freeband – lokal, sporadisch DX bei Es', noise:4 },
+    { band:'10m',  freq:'28.000–29.700 MHz',cw:'28.010 MHz',dayBase:3,  nightBase:0,  dayCond:'Variabel',      nightCond:'Geschlossen',       desc:'Sporadic-E & solar-propagation, zyklisch', noise:2 },
+];
+
+async function loadPskBandActivity() {
+    const results = {};
+    const fetches = BAND_DEFS.map(async (def) => {
+        const fr = BAND_PSK_RANGE[def.band];
+        if (!fr) return;
+        const url = `https://retrieve.pskreporter.info/query?rronly=1&flowStartSeconds=-3600&rptlimit=500&frange=${fr}`;
+        const res = await fetchWithMirrors(url, { timeout: 8000 });
+        if (!res.ok) return;
+        let count = 0;
+        try {
+            const data = typeof res.json === 'object' ? res.json : JSON.parse(res.text);
+            const reports = data.receptionReport || data.ReceptionReport || [];
+            count = Array.isArray(reports) ? reports.length : 0;
+            if (!dataSourceInfo.psk) dataSourceInfo.psk = res.mirror;
+        } catch(e) {
+            const txt = res.text || '';
+            count = (txt.match(/"senderCallsign"/g) || []).length;
+            if (!dataSourceInfo.psk && count > 0) dataSourceInfo.psk = res.mirror;
+        }
+        results[def.band] = { count, fr };
+    });
+    await Promise.allSettled(fetches);
+    pskBandData = results;
+    lastPskFetch = Date.now();
+}
+
+async function loadBandConditions() {
+    const infoEl = document.getElementById('band-update-info');
+    const srcEl = document.getElementById('data-source-badge');
+    infoEl.innerHTML = '<span class="spinner"></span>Lade Solardaten & PSK-Aktivität…';
+    dataSourceInfo = { solar: '', psk: '' };
+
+    const SOLAR_URL = 'https://www.hamqsl.com/solarxml.php';
+
+    const pskPromise = loadPskBandActivity();
+
+    let xmlDoc = null;
+    let usedProxy = '';
+
+    const solarRes = await fetchWithMirrors(SOLAR_URL);
+    if (solarRes.ok && solarRes.text && solarRes.text.includes('<solar>')) {
+        const parser = new DOMParser();
+        xmlDoc = parser.parseFromString(solarRes.text, 'text/xml');
+        if (!xmlDoc.querySelector('parsererror')) usedProxy = solarRes.mirror;
+        else xmlDoc = null;
+    }
+
+    await pskPromise;
+
+    if (!xmlDoc) {
+        infoEl.textContent = 'HamQSL offline – PSK Reporter ' + (Object.keys(pskBandData).length ? 'aktiv' : 'offline') + '. Schätzwerte aktiv.';
+        solarData = null;
+        renderBandConditions();
+        updateQsoPropPanel(document.getElementById('band-select').value);
+        if (srcEl) srcEl.innerHTML = `Quellen: HamQSL <strong>offline</strong> · PSK Reporter via <strong>${dataSourceInfo.psk || '–'}</strong>`;
+        return;
+    }
+
+    // Parse calculated band conditions from HamQSL
+    const calcBands = {};
+    xmlDoc.querySelectorAll('calculatedconditions band').forEach(el => {
+        const name = el.getAttribute('name');   // e.g. "80m-40m"
+        const time = el.getAttribute('time');   // "day" | "night"
+        const cond = el.textContent.trim();     // "Good" | "Fair" | "Poor"
+        if (!calcBands[name]) calcBands[name] = {};
+        calcBands[name][time] = cond;
+    });
+
+    solarData = {
+        sfi:      parseInt(xmlDoc.querySelector('solarflux')?.textContent)   || 0,
+        aindex:   parseInt(xmlDoc.querySelector('aindex')?.textContent)      || 0,
+        kindex:   parseInt(xmlDoc.querySelector('kindex')?.textContent)      || 0,
+        sunspot:  parseInt(xmlDoc.querySelector('sunspots')?.textContent)    || 0,
+        aurora:   xmlDoc.querySelector('aurora')?.textContent?.trim()        || '–',
+        snoise:   xmlDoc.querySelector('signalnoise')?.textContent?.trim()   || '–',
+        geofield: xmlDoc.querySelector('geomagfield')?.textContent?.trim()   || '–',
+        xray:     xmlDoc.querySelector('xray')?.textContent?.trim()          || '–',
+        updated:  xmlDoc.querySelector('updated')?.textContent?.trim()       || '',
+        calcBands,
+    };
+
+    lastFetch = Date.now();
+    renderBandConditions();
+    updateQsoPropPanel(document.getElementById('band-select').value);
+    const pskBands = Object.keys(pskBandData).length;
+    infoEl.textContent = `HamQSL via ${usedProxy} · PSK Reporter (${pskBands} Bänder) · Stand: ${solarData.updated || new Date().toLocaleTimeString('de-DE')}`;
+    if (srcEl) srcEl.innerHTML = `Quellen: HamQSL via <strong>${usedProxy}</strong> · PSK Reporter via <strong>${dataSourceInfo.psk || 'direct'}</strong> (${CORS_PROXIES.length} Spiegel)`;
+}
+
+function getBandCondNow(band) {
+    const def = BAND_DEFS.find(b => b.band === band);
+    if (!def) return { s:5, noise:4, open:true, labelDe:'Mäßig', propLabel:'–', qsbDepth:0.3, qsbLabel:'leicht', wpmMin:12, wpmMax:18, charDropRate:0, freq: BAND_FREQS[band]||'' };
+
+    const hour = new Date().getHours();
+    const isDay = hour >= 7 && hour <= 19;
+
+    let hamRaw = 'Fair';
+    const grp = hamqslGroup(band);
+    if (solarData && grp && solarData.calcBands[grp]) {
+        hamRaw = (isDay ? solarData.calcBands[grp].day : solarData.calcBands[grp].night) || 'Fair';
+    }
+
+    const ham = hamRaw.toLowerCase();
+    let s = ham === 'good' ? 8 : (ham === 'fair' ? 5 : 2);
+    if (!solarData) {
+        s = isDay ? def.dayBase : def.nightBase;
+    }
+
+    if (solarData) {
+        const sfiBonus = Math.min(2, Math.max(-2, (solarData.sfi - 90) / 40));
+        const kPenalty = -Math.max(0, solarData.kindex - 1) * 0.7;
+        const aPenalty = solarData.aindex > 15 ? -1 : 0;
+        s = Math.round(Math.max(0, Math.min(9, s + sfiBonus + kPenalty + aPenalty)));
+    }
+
+    const psk = pskBandData[band];
+    let pskSpots = null;
+    if (psk && psk.count > 0) {
+        pskSpots = psk.count;
+        const activityBonus = psk.count >= 200 ? 2 : (psk.count >= 80 ? 1 : (psk.count >= 20 ? 0 : -1));
+        s = Math.round(Math.max(0, Math.min(9, s + activityBonus)));
+    } else if (psk && psk.count === 0) {
+        pskSpots = 0;
+        s = Math.max(0, s - 1);
+    }
+
+    const labelDe = ham === 'good' ? 'Gut' : (ham === 'fair' ? 'Mäßig' : 'Schlecht');
+    const open = s >= 2 && ham !== 'poor';
+    const noise = Math.max(1, Math.min(9, def.noise - Math.floor(s / 3) + (solarData && solarData.kindex >= 4 ? 2 : 0)));
+    const qsbDepth = ham === 'poor' ? 0.55 : (ham === 'fair' ? 0.35 : 0.15);
+    const qsbLabel = qsbDepth >= 0.5 ? 'stark' : (qsbDepth >= 0.3 ? 'mittel' : 'leicht');
+    const wpmMin = Math.max(8, 10 + Math.floor(s / 2));
+    const wpmMax = Math.min(28, wpmMin + 6 + Math.floor(s / 2));
+    const charDropRate = s <= 2 ? 0.25 : (s <= 4 ? 0.08 : (pskSpots === 0 ? 0.12 : 0));
+
+    return {
+        s, noise, open, labelDe, hamRaw, pskSpots,
+        propLabel: labelDe + (solarData ? ` (SFI ${solarData.sfi})` : '') + (pskSpots != null ? ` · ${pskSpots} spots/h` : ''),
+        qsbDepth, qsbLabel, wpmMin, wpmMax, charDropRate, freq: def.freq
+    };
+}
+
+// Map a band (e.g. "40m") to the HamQSL group key (e.g. "80m-40m")
+function hamqslGroup(band) {
+    if (['160m','80m','40m'].includes(band)) return '80m-40m';
+    if (['60m','30m','20m'].includes(band))  return '30m-20m';
+    if (['17m','15m'].includes(band))        return '17m-15m';
+    if (['12m','10m','11m'].includes(band))        return '12m-10m';
+    return null;
+}
+
+// Translate HamQSL English condition to German label + CSS class
+function condInfo(raw) {
+    const r = (raw || '').toLowerCase();
+    if (r === 'good') return { cls:'good', label:'Gut' };
+    if (r === 'fair') return { cls:'fair', label:'Mäßig' };
+    if (r === 'poor') return { cls:'poor', label:'Schlecht' };
+    return { cls:'fair', label: raw || '–' };
+}
+
+function renderBandConditions() {
+    if (solarData) {
+        document.getElementById('s-sfi').textContent = solarData.sfi;
+        document.getElementById('s-sfi').className = 'solar-val' + (solarData.sfi < 80 ? ' warn' : '');
+        document.getElementById('s-aindex').textContent = solarData.aindex;
+        document.getElementById('s-aindex').className = 'solar-val' + (solarData.aindex > 20 ? ' bad' : (solarData.aindex > 7 ? ' warn' : ''));
+        document.getElementById('s-kindex').textContent = solarData.kindex;
+        document.getElementById('s-kindex').className = 'solar-val' + (solarData.kindex >= 4 ? ' bad' : (solarData.kindex >= 2 ? ' warn' : ''));
+        document.getElementById('s-sunspot').textContent = solarData.sunspot;
+        document.getElementById('s-aurora').textContent  = solarData.aurora;
+        document.getElementById('s-snoise').textContent  = solarData.snoise;
+        // Extra fields (only shown if available)
+        const geoEl = document.getElementById('s-geofield');
+        const xrayEl = document.getElementById('s-xray');
+        if (geoEl)  geoEl.textContent  = solarData.geofield || '–';
+        if (xrayEl) xrayEl.textContent = solarData.xray    || '–';
+    }
+
+    const hour = new Date().getHours();
+    const isDay = hour >= 7 && hour <= 19;
+
+    const tbody = document.getElementById('cond-tbody');
+    tbody.innerHTML = '';
+    for (const def of BAND_DEFS) {
+        const now = getBandCondNow(def.band);
+
+        // Use real HamQSL data when available, fall back to static estimates
+        let dayInfo, nightInfo, nowInfo;
+        const grp = hamqslGroup(def.band);
+        if (solarData && grp && solarData.calcBands[grp]) {
+            const cb = solarData.calcBands[grp];
+            dayInfo   = condInfo(cb.day);
+            nightInfo = condInfo(cb.night);
+            nowInfo   = isDay ? dayInfo : nightInfo;
+        } else {
+            dayInfo   = { cls: def.dayBase  >= 6 ? 'good' : (def.dayBase  >= 3 ? 'fair' : 'poor'), label: def.dayCond };
+            nightInfo = { cls: def.nightBase >= 6 ? 'good' : (def.nightBase >= 3 ? 'fair' : 'poor'), label: def.nightCond };
+            nowInfo   = { cls: now.s >= 6 ? 'good' : (now.s >= 3 ? 'fair' : 'poor'), label: now.s >= 6 ? 'Gut' : (now.s >= 3 ? 'Mäßig' : 'Schlecht') };
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${def.band}</strong></td>
+            <td style="color:var(--text-muted); font-size:0.82rem">${def.freq}</td>
+            <td style="color:#60a5fa; font-family:monospace; font-size:0.85rem">${def.cw}</td>
+            <td><span class="cond-badge ${dayInfo.cls}">${dayInfo.label}</span></td>
+            <td><span class="cond-badge ${nightInfo.cls}">${nightInfo.label}</span></td>
+            <td><span class="cond-badge ${nowInfo.cls}">S${now.s} – ${nowInfo.label}</span></td>
+            <td style="color:var(--text-muted)">S${now.noise}${now.pskSpots != null ? ' · ' + now.pskSpots + ' spots' : ''}</td>
+            <td style="color:var(--text-muted); font-size:0.78rem; max-width:200px">${def.desc}</td>
+        `;
+        tbody.appendChild(tr);
+    }
+}
+
+setInterval(() => {
+    if (document.getElementById('tab-bands').classList.contains('active')) {
+        loadBandConditions();
+    }
+}, 10 * 60 * 1000);
+
+// INIT
+loadProgress();
+updateDebounceDisplay();
+updateKochProgress();
+document.getElementById('val-level').innerText = currentLevel + 1;
+document.getElementById('val-streak').innerText = streak;
+document.getElementById('val-accuracy').innerText = totalCount > 0 ? Math.round(correctCount / totalCount * 100) + '%' : '–';
+const initSlider = document.getElementById('wpm-slider');
+if (initSlider) { initSlider.value = currentWPM; onWpmSlider(currentWPM); }
+nextTask();
+loadBandConditions();
+</script>
+</body>
+</html>
