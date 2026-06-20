@@ -394,12 +394,14 @@
             <div class="solar-item"><div class="solar-label">X-Ray</div><div class="solar-val" id="s-xray">–</div></div>
         </div>
 
+        <div style="overflow-x:auto;">
         <table class="band-table">
             <thead>
-                <tr><th>Band</th><th>Bereich</th><th>CW-Freq</th><th>Tag</th><th>Nacht</th><th>Jetzt</th><th>QRN</th><th>Info</th></tr>
+                <tr><th>Band</th><th>Bereich</th><th>CW-Freq</th><th>Tag</th><th>Nacht</th><th>Beste Zeit (UTC)</th><th>Jetzt</th><th>QRN</th><th>Info</th></tr>
             </thead>
             <tbody id="cond-tbody"></tbody>
         </table>
+        </div>
     </div>
 
 </div>
@@ -973,7 +975,16 @@ function showHint() {
 // fromHardware=true  → Arduino/BLE: festes Timeout (sync mit .ino)
 // fromHardware=false → Tastatur: adaptiver PARIS-basierter Debounce
 function processIncomingSignal(signal, fromHardware = false) {
-    if (trainerLocked || trainerPhase === 'intro') return;
+    // BUGFIX: Der Koch-Trainer läuft im Hintergrund weiter, auch wenn man im QSO-Tab
+    // ist (er kann z.B. gerade "intro" oder "locked" sein). Vorher hat dieser Zustand
+    // JEDES Signal komplett verschluckt – auch Paddel/Keyer-Eingaben für ein laufendes
+    // QSO. Jetzt darf ein laufendes QSO (tx / wait_reply / exchange) Signale immer
+    // empfangen, unabhängig vom Trainer-Status. Der Trainer-Teil (Anzeige/Auswertung)
+    // wird weiterhin übersprungen, solange er gesperrt/im Intro ist.
+    const qsoExpectingInput = (qsoPhase === 'tx' || qsoPhase === 'wait_reply' || qsoPhase === 'exchange');
+    const trainerBusy = trainerLocked || trainerPhase === 'intro';
+
+    if (trainerBusy && !qsoExpectingInput) return;
 
     const now = Date.now();
 
@@ -982,9 +993,30 @@ function processIncomingSignal(signal, fromHardware = false) {
         if (inputBuffer.length > 0 && (now - lastSignalTime) < 30) return;
     }
     lastSignalTime = now;
-    morseDecoder.recordSignal();
 
-    playTone(signal === '.' ? 0.06 : 0.2);
+    // Tonlänge richtet sich nach der eingestellten WPM (statt einer festen Länge),
+    // sonst hört sich der Ton bei langsamerem Keying "abgeschnitten" an, weil er
+    // endet, bevor die Taste/das Paddel wieder losgelassen wird.
+    const toneLen = dotMs(currentWPM) / 1000;
+    playTone(signal === '.' ? toneLen : toneLen * 3);
+
+    if (qsoExpectingInput) {
+        // BUGFIX: Vorher wurden Paddel/Tasten-Signale nur roh aneinandergehängt
+        // (qsoTxBuffer) und nie zu Buchstaben zusammengefasst – dadurch kam beim
+        // Senden nie lesbarer Text heraus. Jetzt wird, genau wie beim Trainer, nach
+        // einer Buchstaben-Pause dekodiert und das Ergebnis live ins TX-Feld getippt.
+        qsoLetterBuffer += signal;
+        clearTimeout(qsoLetterTimeout);
+        const qsoAmbig = isMorsePrefix(qsoLetterBuffer);
+        const qsoDelay = fromHardware
+            ? (qsoAmbig ? ARDUINO_CHAR_TIMEOUT_AMBIG : ARDUINO_CHAR_TIMEOUT) + HW_EVAL_BUFFER_MS
+            : letterGapMs(currentWPM);
+        qsoLetterTimeout = setTimeout(finishQsoLetter, qsoDelay);
+    }
+
+    if (trainerBusy) return; // Trainer ist gesperrt/im Intro → Trainer-Anzeige/Auswertung überspringen
+
+    morseDecoder.recordSignal();
 
     inputBuffer += signal;
     const liveEl = document.getElementById('live-input');
@@ -1000,10 +1032,17 @@ function processIncomingSignal(signal, fromHardware = false) {
     clearTimeout(inputTimeout);
     const evalDelay = morseDecoder.evalDelayMs(fromHardware, currentWPM, inputBuffer);
     inputTimeout = setTimeout(() => evaluateInput(), evalDelay);
+}
 
-    if (qsoPhase === 'tx' || qsoPhase === 'wait_reply' || qsoPhase === 'exchange') {
-        qsoTxBuffer += signal;
-    }
+// Wird per Timeout aufgerufen, sobald beim QSO-Senden (Paddel/Taste) eine
+// Buchstaben-Pause erkannt wurde: dekodiert den gesammelten Code und tippt
+// das Ergebnis direkt ins TX-Eingabefeld.
+function finishQsoLetter() {
+    if (!qsoLetterBuffer) return;
+    const letter = morseReverse[qsoLetterBuffer] || '?';
+    qsoLetterBuffer = '';
+    const input = document.getElementById('tx-input');
+    if (input) input.value += letter;
 }
 
 function evaluateInput() {
@@ -1089,6 +1128,8 @@ let qsoPhase        = 'idle';
 let noiseSource     = null;
 let smeterInterval  = null;
 let qsoTxBuffer     = '';
+let qsoLetterBuffer  = '';  // aktueller Buchstabe (./- ) der gerade per Taste/Paddel gekeyt wird
+let qsoLetterTimeout = null; // Timer, der den Buchstaben nach einer Pause dekodiert & einfügt
 let qsoStep         = 0;
 let dxCallsign      = '';
 let dxName          = '';
@@ -1242,10 +1283,16 @@ async function startQSO() {
     logQSO('[System] Antworte mit deinem Rufzeichen (Morse oder Textfeld)!', 'sys');
     logQSO(`[Tipp] ${dxCallsign} DE ${myCallsign()} ${myCallsign()} K`, 'sys');
     qsoTxBuffer = '';
+    qsoLetterBuffer = '';
+    clearTimeout(qsoLetterTimeout);
     qsoStep = 1;
 }
 
 async function sendQsoReply() {
+    // Noch ausstehenden, halb gekeyten Buchstaben verwerfen statt ihn verspätet
+    // nach dem Senden ins Feld zu tippen.
+    clearTimeout(qsoLetterTimeout);
+    qsoLetterBuffer = '';
     let inp = document.getElementById('tx-input').value.trim().toUpperCase();
     if (!inp && qsoTxBuffer) {
         inp = decodeMorseBuffer(qsoTxBuffer);
@@ -1328,6 +1375,8 @@ function stopQSO() {
     document.getElementById('smeter-bar').style.width = '0%';
     document.getElementById('smeter-val').innerText = 'S0';
     document.getElementById('cw-waterfall').style.display = 'none';
+    clearTimeout(qsoLetterTimeout);
+    qsoLetterBuffer = '';
     setQsoPhase('idle');
     logQSO('[System] RX gestoppt.', 'sys');
 }
@@ -1512,17 +1561,17 @@ async function fetchWithMirrors(targetUrl, opts = {}) {
 }
 
 const BAND_DEFS = [
-    { band:'160m', freq:'1.800–2.000 MHz',  cw:'1.810 MHz', dayBase:1,  nightBase:4,  dayCond:'Sehr schlecht', nightCond:'Regional (500km)',  desc:'Topband – nur nachts regional, selten DX', noise:9 },
-    { band:'80m',  freq:'3.500–3.800 MHz',  cw:'3.510 MHz', dayBase:2,  nightBase:7,  dayCond:'Regional',      nightCond:'DX möglich',        desc:'Abend/Nacht-Band, Europa & DX nachts', noise:7 },
-    { band:'60m',  freq:'5.351–5.367 MHz',  cw:'–',         dayBase:3,  nightBase:5,  dayCond:'Regional',      nightCond:'Kontinent',         desc:'Nur ITU-Kanäle, begrenzte Leistung', noise:6 },
-    { band:'40m',  freq:'7.000–7.200 MHz',  cw:'7.010 MHz', dayBase:5,  nightBase:8,  dayCond:'Europa',        nightCond:'DX / Weltweit',     desc:'Bestes Allround-Band, tagsüber Europa, nachts DX', noise:5 },
-    { band:'30m',  freq:'10.100–10.150 MHz',cw:'10.106 MHz',dayBase:6,  nightBase:6,  dayCond:'DX / Gut',      nightCond:'DX / Gut',          desc:'WARC-Band, nur CW/Daten, kein SSB', noise:4 },
-    { band:'20m',  freq:'14.000–14.350 MHz',cw:'14.010 MHz',dayBase:7,  nightBase:4,  dayCond:'Weltweit',      nightCond:'Mäßig',             desc:'Das DX-Band par excellence, tags hervorragend', noise:3 },
-    { band:'17m',  freq:'18.068–18.168 MHz',cw:'18.069 MHz',dayBase:6,  nightBase:3,  dayCond:'Gut / DX',      nightCond:'Schwach',           desc:'WARC-Band, ruhig, wenig Pileuups', noise:3 },
-    { band:'15m',  freq:'21.000–21.450 MHz',cw:'21.010 MHz',dayBase:5,  nightBase:1,  dayCond:'DX (solar)',    nightCond:'Geschlossen',       desc:'Zyklus-abhängig, bei hohem SFI sehr gut', noise:2 },
-    { band:'12m',  freq:'24.890–24.990 MHz',cw:'24.895 MHz',dayBase:3,  nightBase:0,  dayCond:'Variabel',      nightCond:'Geschlossen',       desc:'WARC-Band, öffnet nur bei gutem SFI', noise:2 },
-    { band:'11m',  freq:'26.965–27.405 MHz',cw:'27.555 MHz',dayBase:4,  nightBase:2,  dayCond:'Regional/CB',   nightCond:'Regional',          desc:'11m CB/Freeband – lokal, sporadisch DX bei Es', noise:4 },
-    { band:'10m',  freq:'28.000–29.700 MHz',cw:'28.010 MHz',dayBase:3,  nightBase:0,  dayCond:'Variabel',      nightCond:'Geschlossen',       desc:'Sporadic-E & solar-propagation, zyklisch', noise:2 },
+    { band:'160m', freq:'1.800–2.000 MHz',  cw:'1.810 MHz', dayBase:1,  nightBase:4,  dayCond:'Sehr schlecht', nightCond:'Regional (500km)',  desc:'Topband – nur nachts regional, selten DX', noise:9, best:'21–05 UTC · Peak um Sonnenauf-/-untergang (Grey-Line)' },
+    { band:'80m',  freq:'3.500–3.800 MHz',  cw:'3.510 MHz', dayBase:2,  nightBase:7,  dayCond:'Regional',      nightCond:'DX möglich',        desc:'Abend/Nacht-Band, Europa & DX nachts', noise:7, best:'18–06 UTC · DX-Peak kurz nach lokalem Sonnenuntergang' },
+    { band:'60m',  freq:'5.351–5.367 MHz',  cw:'–',         dayBase:3,  nightBase:5,  dayCond:'Regional',      nightCond:'Kontinent',         desc:'Nur ITU-Kanäle, begrenzte Leistung', noise:6, best:'17–07 UTC · ähnlich 80m' },
+    { band:'40m',  freq:'7.000–7.200 MHz',  cw:'7.010 MHz', dayBase:5,  nightBase:8,  dayCond:'Europa',        nightCond:'DX / Weltweit',     desc:'Bestes Allround-Band, tagsüber Europa, nachts DX', noise:5, best:'06–09 & 18–23 UTC · Grey-Line-Peaks, sonst ganztags Europa' },
+    { band:'30m',  freq:'10.100–10.150 MHz',cw:'10.106 MHz',dayBase:6,  nightBase:6,  dayCond:'DX / Gut',      nightCond:'DX / Gut',          desc:'WARC-Band, nur CW/Daten, kein SSB', noise:4, best:'ganztags · am stabilsten 16–22 UTC' },
+    { band:'20m',  freq:'14.000–14.350 MHz',cw:'14.010 MHz',dayBase:7,  nightBase:4,  dayCond:'Weltweit',      nightCond:'Mäßig',             desc:'Das DX-Band par excellence, tags hervorragend', noise:3, best:'07–20 UTC · Peak Vor-/Nachmittag' },
+    { band:'17m',  freq:'18.068–18.168 MHz',cw:'18.069 MHz',dayBase:6,  nightBase:3,  dayCond:'Gut / DX',      nightCond:'Schwach',           desc:'WARC-Band, ruhig, wenig Pileuups', noise:3, best:'09–17 UTC' },
+    { band:'15m',  freq:'21.000–21.450 MHz',cw:'21.010 MHz',dayBase:5,  nightBase:1,  dayCond:'DX (solar)',    nightCond:'Geschlossen',       desc:'Zyklus-abhängig, bei hohem SFI sehr gut', noise:2, best:'10–16 UTC · nur bei höherem SFI (>~100) offen' },
+    { band:'12m',  freq:'24.890–24.990 MHz',cw:'24.895 MHz',dayBase:3,  nightBase:0,  dayCond:'Variabel',      nightCond:'Geschlossen',       desc:'WARC-Band, öffnet nur bei gutem SFI', noise:2, best:'11–15 UTC · nur bei sehr hohem SFI' },
+    { band:'11m',  freq:'26.965–27.405 MHz',cw:'27.555 MHz',dayBase:4,  nightBase:2,  dayCond:'Regional/CB',   nightCond:'Regional',          desc:'11m CB/Freeband – lokal, sporadisch DX bei Es', noise:4, best:'10–16 UTC im Sommer (Sporadic-E)' },
+    { band:'10m',  freq:'28.000–29.700 MHz',cw:'28.010 MHz',dayBase:3,  nightBase:0,  dayCond:'Variabel',      nightCond:'Geschlossen',       desc:'Sporadic-E & solar-propagation, zyklisch', noise:2, best:'10–16 UTC im Sommer (Es) · bei hohem SFI auch DX' },
 ];
 
 async function loadPskBandActivity() {
@@ -1732,6 +1781,7 @@ function renderBandConditions() {
             <td style="color:#60a5fa; font-family:monospace; font-size:0.85rem">${def.cw}</td>
             <td><span class="cond-badge ${dayInfo.cls}">${dayInfo.label}</span></td>
             <td><span class="cond-badge ${nightInfo.cls}">${nightInfo.label}</span></td>
+            <td style="color:var(--text-muted); font-size:0.8rem; max-width:180px">${def.best}</td>
             <td><span class="cond-badge ${nowInfo.cls}">S${now.s} – ${nowInfo.label}</span></td>
             <td style="color:var(--text-muted)">S${now.noise}${now.pskSpots != null ? ' · ' + now.pskSpots + ' spots' : ''}</td>
             <td style="color:var(--text-muted); font-size:0.78rem; max-width:200px">${def.desc}</td>
